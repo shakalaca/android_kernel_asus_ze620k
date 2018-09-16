@@ -1566,7 +1566,7 @@ static void asus_lcd_delay_work_func(struct work_struct *ws)
 
 			if (asus_lcd_is_second_source()) {
 				g_asus_lcdID = ARA_LCD_AUO_2;
-				qpnp_wled_fs_curr_ua_set(ARA_AUO_PANEL2_WLED_FS_CURR_UA);
+				//qpnp_wled_fs_curr_ua_set(ARA_AUO_PANEL2_WLED_FS_CURR_UA);
 			}
 
 		}

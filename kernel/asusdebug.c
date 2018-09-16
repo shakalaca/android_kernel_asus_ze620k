@@ -944,7 +944,7 @@ static void do_write_event_worker(struct work_struct *work)
 		g_hfileEvtlog = sys_open(ASUS_EVTLOG_PATH ".txt", O_CREAT | O_RDWR | O_SYNC, 0666);
 		//sys_chown(ASUS_EVTLOG_PATH ".txt", AID_SDCARD_RW, AID_SDCARD_RW);
 		size = sys_lseek(g_hfileEvtlog, 0, SEEK_END);
-		if (size >= SZ_2M) {
+		if (size >= SZ_16M) {
 			sys_close(g_hfileEvtlog);
 			sys_rmdir(ASUS_EVTLOG_PATH "_old.txt");
 			sys_rename(ASUS_EVTLOG_PATH ".txt", ASUS_EVTLOG_PATH "_old.txt");
@@ -990,7 +990,7 @@ static void do_write_event_worker(struct work_struct *work)
 		//sys_chown(ASUS_EVTLOG_PATH ".txt", AID_SDCARD_RW, AID_SDCARD_RW);
 
 		size = sys_lseek(g_hfileEvtlog, 0, SEEK_END);
-		if (size >= SZ_2M) {
+		if (size >= SZ_16M) {
 			sys_close(g_hfileEvtlog);
 			sys_rmdir(ASUS_EVTLOG_PATH "_old.txt");
 			sys_rename(ASUS_EVTLOG_PATH ".txt", ASUS_EVTLOG_PATH "_old.txt");

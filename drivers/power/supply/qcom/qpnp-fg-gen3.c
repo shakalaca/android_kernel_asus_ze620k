@@ -4452,6 +4452,15 @@ static int fg_hw_init(struct fg_chip *chip)
 		}
 	}
 
+//ASUS_BSP LiJen +++
+	//Disable Low Battery Detection
+	rc = fg_masked_write(chip, 0x1260, BIT(0), 0x0);
+	if (rc < 0) {
+		pr_err("Error in writing Disable Low Battery Detection, rc=%d\n", rc);
+		return rc;
+	}
+//ASUS_BSP LiJen  ---
+
 	return 0;
 }
 
