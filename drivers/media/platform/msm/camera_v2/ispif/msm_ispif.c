@@ -1360,6 +1360,12 @@ static int msm_ispif_stop_frame_boundary(struct ispif_device *ispif,
 		return rc;
 	}
 
+	//ASUS_BSP +++ Bryant "Qualcomm patch for fix STS testPocBug_34624155"
+	 if ( ispif->vfe_info.num_vfe != 2 ) {
+		return EINVAL;
+	}
+	//ASUS_BSP --- Bryant "Qualcomm patch for fix STS testPocBug_34624155"
+
 	if (params->num > MAX_PARAM_ENTRIES) {
 		pr_err("%s: invalid param entries %d\n", __func__,
 			params->num);
@@ -1749,6 +1755,12 @@ static int msm_ispif_init(struct ispif_device *ispif,
 		rc = -EPERM;
 		return rc;
 	}
+
+	//ASUS_BSP +++ Bryant "Qualcomm patch for fix STS testPocBug_34624155"
+	if ( ispif->vfe_info.num_vfe != 2 ) {
+		return EINVAL;
+	}
+	//ASUS_BSP --- Bryant "Qualcomm patch for fix STS testPocBug_34624155"
 
 	/* can we set to zero? */
 	ispif->applied_intf_cmd[VFE0].intf_cmd  = 0xFFFFFFFF;
