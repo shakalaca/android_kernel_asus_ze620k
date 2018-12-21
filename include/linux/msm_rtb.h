@@ -36,8 +36,6 @@ struct msm_rtb_platform_data {
 	unsigned int size;
 };
 
-
-
 /* Write
  * 1) 3 bytes sentinel
  * 2) 1 bytes of log type

@@ -30,7 +30,6 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 #include "mmc_config.h"		//ASUS_BSP PeterYeh : eMMC porting
-
 static u8 life_time_B;			//ASUS_BSP PeterYeh : gobel variable for emmc health
 static int hynix_erase_count = 0; // ASUS_BSP PeterYeh : for dump hynix erase count
 static int IS_BOOT_TIME = 1;  //ASUS_BSP PeterYeh : do not read EXT_CSD data in boot time
@@ -211,9 +210,7 @@ static char* asus_get_emmc_total_size(struct mmc_card *card)
 	return card->mmc_total_size;
 }
 //ASUS_BSP --- PeterYeh "add eMMC total size for AMAX"
-
 static int mmc_switch_status(struct mmc_card *card, bool ignore_crc);
-
 /*
  * Given the decoded CSD structure, decode the raw CID to our CID structure.
  */
@@ -891,7 +888,6 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.device_life_time_est_typ_b =
 			ext_csd[EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B];
 	}
-
 out:
 	return err;
 }
@@ -1516,6 +1512,8 @@ static int mmc_select_hs400(struct mmc_card *card)
 	if (card->ext_csd.strobe_support && host->ops->enhanced_strobe) {
 		mmc_host_clk_hold(host);
 		err = host->ops->enhanced_strobe(host);
+		if (!err)
+			host->ios.enhanced_strobe = true;
 		mmc_host_clk_release(host);
 	} else if ((host->caps2 & MMC_CAP2_HS400_POST_TUNING) &&
 			host->ops->execute_tuning) {
@@ -2078,7 +2076,7 @@ static void mmc_dump_status(struct mmc_card *card, u8 *ext_csd)
 			card->ext_csd.pre_eol_info);
 			pr_info("%s", mmc_status);
 
-	ASUSEvtlog("%s", mmc_status);
+//	ASUSEvtlog("%s", mmc_status);
 }
 #if 0
 static int mmc_check_status(struct mmc_card *card)
@@ -2098,8 +2096,6 @@ static int mmc_check_status(struct mmc_card *card)
 }
 #endif
 #endif
-//ASUS_BSP PeterYeh : check eMMC health status ---
-
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -2113,12 +2109,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	int err;
 	u32 cid[4];
 	u32 rocr;
-	u8 *ext_csd = NULL;
+	u8 *ext_csd = NULL;//ASUS_BSP
 
 	BUG_ON(!host);
 	WARN_ON(!host->claimed);
 
-	printk("[EMMC][%s] mmc_init_card()\n", mmc_hostname(host));
+	printk("[EMMC][%s] mmc_init_card()\n", mmc_hostname(host));//ASUS_BSP
 	/* Set correct bus mode for MMC before attempting init */
 	if (!mmc_host_is_spi(host))
 		mmc_set_bus_mode(host, MMC_BUSMODE_OPENDRAIN);
@@ -2193,17 +2189,6 @@ reinit:
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
 		host->card = card;
 		card->reboot_notify.notifier_call = mmc_reboot_notify;
-
-//ASUS_BSP +++ Gavin_Chang "mmc cmd statistics"
-		card->cmd_stats = kzalloc(sizeof(struct mmc_cmd_stats), GFP_KERNEL);
-		if (!card->cmd_stats) {
-			err = -ENOMEM;
-			goto err;
-		}
-
-		card->cmd_stats->enabled = false;
-		spin_lock_init(&card->cmd_stats->lock);
-//ASUS_BSP +++ Gavin_Chang "mmc cmd statistics"
 	}
 
 	/*
@@ -2284,7 +2269,6 @@ reinit:
 			printk("[eMMC]:%s==>get the erase count successfull.\n",__func__);
 		}
 		//ASUS_BSP PeterYeh : dump hynix emmc erase count ---
-
 		/* Read extended CSD. */
 		err = mmc_read_ext_csd(card);
 		if (err) {
@@ -2292,7 +2276,6 @@ reinit:
 					mmc_hostname(host), __func__, err);
 			goto free_card;
 		}
-
 //ASUS_BSP PeterYeh : dump eMMC health to log +++
 #ifdef EMMC_STATUS
 		err = mmc_get_ext_csd(card, &ext_csd);
@@ -2739,9 +2722,9 @@ static int mmc_can_poweroff_notify(const struct mmc_card *card)
 {
 //ASUS_BSP PeterYeh: turn off PON +++
 	if(MMC_CONFIG_SETTING_PON){
-		return card &&
-			mmc_card_mmc(card) &&
-			(card->ext_csd.power_off_notification == EXT_CSD_POWER_ON);
+	return card &&
+		mmc_card_mmc(card) &&
+		(card->ext_csd.power_off_notification == EXT_CSD_POWER_ON);
 	}
 	else
 		return 0;
@@ -3304,7 +3287,6 @@ int mmc_runtime_resume_test(struct mmc_host *host)
 EXPORT_SYMBOL(mmc_runtime_resume_test);
 #endif
 //ASUS_BSP PeterYeh : mmc suspend stress test ---
-
 int mmc_can_reset(struct mmc_card *card)
 {
 	u8 rst_n_function;
@@ -3373,6 +3355,73 @@ static int mmc_shutdown(struct mmc_host *host)
 	return 0;
 }
 
+static int mmc_pre_hibernate(struct mmc_host *host)
+{
+	int ret = 0;
+
+	mmc_get_card(host->card);
+	host->cached_caps2 = host->caps2;
+
+	/*
+	 * Increase usage_count of card and host device till
+	 * hibernation is over. This will ensure they will not runtime suspend.
+	 */
+	pm_runtime_get_noresume(mmc_dev(host));
+	pm_runtime_get_noresume(&host->card->dev);
+
+	if (!mmc_can_scale_clk(host))
+		goto out;
+	/*
+	 * Suspend clock scaling and mask host capability so that
+	 * we will run in max frequency during:
+	 *	1. Hibernation preparation and image creation
+	 *	2. After finding hibernation image during reboot
+	 *	3. Once hibernation image is loaded and till hibernation
+	 *	restore is complete.
+	 */
+	if (host->clk_scaling.enable)
+		mmc_suspend_clk_scaling(host);
+	host->caps2 &= ~MMC_CAP2_CLK_SCALE;
+	host->clk_scaling.state = MMC_LOAD_HIGH;
+	ret = mmc_clk_update_freq(host, host->card->clk_scaling_highest,
+				host->clk_scaling.state);
+	if (ret)
+		pr_err("%s: %s: Setting clk frequency to max failed: %d\n",
+				mmc_hostname(host), __func__, ret);
+out:
+	mmc_host_clk_hold(host);
+	mmc_put_card(host->card);
+	return ret;
+}
+
+static int mmc_post_hibernate(struct mmc_host *host)
+{
+	int ret = 0;
+
+	mmc_get_card(host->card);
+	if (!(host->cached_caps2 & MMC_CAP2_CLK_SCALE))
+		goto enable_pm;
+	/* Enable the clock scaling and set the host capability */
+	host->caps2 |= MMC_CAP2_CLK_SCALE;
+	if (!host->clk_scaling.enable)
+		ret = mmc_resume_clk_scaling(host);
+	if (ret)
+		pr_err("%s: %s: Resuming clk scaling failed: %d\n",
+				mmc_hostname(host), __func__, ret);
+enable_pm:
+	/*
+	 * Reduce usage count of card and host device so that they may
+	 * runtime suspend.
+	 */
+	pm_runtime_put_noidle(&host->card->dev);
+	pm_runtime_put_noidle(mmc_dev(host));
+
+	mmc_host_clk_release(host);
+
+	mmc_put_card(host->card);
+	return ret;
+}
+
 static const struct mmc_bus_ops mmc_ops = {
 	.remove = mmc_remove,
 	.detect = mmc_detect,
@@ -3384,6 +3433,8 @@ static const struct mmc_bus_ops mmc_ops = {
 	.change_bus_speed = mmc_change_bus_speed,
 	.reset = mmc_reset,
 	.shutdown = mmc_shutdown,
+	.pre_hibernate = mmc_pre_hibernate,
+	.post_hibernate = mmc_post_hibernate
 };
 
 /*

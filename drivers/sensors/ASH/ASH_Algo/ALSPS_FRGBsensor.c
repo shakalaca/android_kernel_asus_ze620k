@@ -1559,8 +1559,10 @@ int mproximity_store_switch_onoff(bool bOn)
 			g_ps_data->HAL_switch_on = false;				
 			proximity_turn_onoff(false);
 			psensor_report_abs(-1);
-			ftxxxx_disable_touch(false);
-			touch_enable = 1;
+//#ifdef ASUS_DISABLE_TOUCH_PORTING_COMPLETED
+			//ftxxxx_disable_touch(false);
+			//touch_enable = 1;
+//#endif
 		}			
 	}else{
 		log("Proximity is already %s", bOn?"ON":"OFF");
@@ -1803,12 +1805,16 @@ int mproximity_store_touch_enable(bool enable)
 	int ret=0;
 	
 	if(enable && touch_enable == 0){
-		ftxxxx_disable_touch(false);
-		touch_enable = 1;
+//#ifdef ASUS_DISABLE_TOUCH_PORTING_COMPLETED
+		//ftxxxx_disable_touch(false);
+		//touch_enable = 1;
+//#endif
 		log("Proximity store enable touch: %d\n", touch_enable);
 	} else if(!enable && touch_enable == 1){
-		ftxxxx_disable_touch(true);
-		touch_enable = 0;
+//#ifdef ASUS_DISABLE_TOUCH_PORTING_COMPLETED
+		//ftxxxx_disable_touch(true);
+		//touch_enable = 0;
+//#endif
 		log("Proximity store disable touch: %d\n", touch_enable);
 	}
 	
@@ -2018,7 +2024,7 @@ static FRGBsensor_ATTR mFRGBsensor_ATTR = {
 static void proximity_work(int state)
 {
 	int adc = 0;
-	int audio_mode = 0;
+	//int audio_mode = 0;
 
 	/* Get Proximity adc value */
 	adc= ALSPS_FRGB_hw_client->mpsensor_hw->proximity_hw_get_adc();
@@ -2035,12 +2041,14 @@ static void proximity_work(int state)
 			log("[ISR] Proximity Detect Object Away. (adc = %d)\n", adc);
 			psensor_report_abs(PSENSOR_REPORT_PS_AWAY);
 			g_ps_data->event_counter++;	/* --- For stress test debug --- */
-
 			//audio_mode = get_audiomode();
 			//if (0 == audio_mode || 2 == audio_mode || 3 == audio_mode) {
 			//	ftxxxx_disable_touch(false);
 			//}
-			ftxxxx_disable_touch(false);
+//#ifdef ASUS_DISABLE_TOUCH_PORTING_COMPLETED
+			//ftxxxx_disable_touch(false);
+			//touch_enable = 1;
+//#endif
 		} else if (ALSPS_INT_PS_CLOSE == state) {
 			if(pocket_mode_threshold > 0 && adc > pocket_mode_threshold){
 				log("[ISR] Proximity Detect Object Close. (adc = %d, distance < 1cm)\n", adc);		
@@ -2050,11 +2058,15 @@ static void proximity_work(int state)
 				psensor_report_abs(PSENSOR_REPORT_PS_CLOSE);
 			}
 			g_ps_data->event_counter++;	/* --- For stress test debug --- */
-			audio_mode = get_audiomode();
-			if (2 == audio_mode || 3 == audio_mode) {
-				ftxxxx_disable_touch(true);
-				touch_enable = 0;
-			}
+//#ifdef ASUS_AUDIO_MODE_PORTING_COMPLETED
+			//audio_mode = get_audiomode();
+//#endif
+			//if (2 == audio_mode || 3 == audio_mode) {
+//#ifdef ASUS_DISABLE_TOUCH_PORTING_COMPLETED
+				//ftxxxx_disable_touch(true);
+				//touch_enable = 0;
+//#endif
+			//}
 		} else {
 			err("[ISR] Proximity Detect Object ERROR. (adc = %d)\n", adc);
 		}

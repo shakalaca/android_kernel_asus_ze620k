@@ -19,11 +19,14 @@ extern phys_addr_t RTB_BUFFER_PA;
 #define PHONE_HANG_LOG_BUFFER   ((void *)((ulong)PRINTK_BUFFER_VA + (ulong)2*PRINTK_BUFFER_SLOT_SIZE) - (ulong)0x3F000)
 #define PHONE_HANG_LOG_SIZE     (0x00080000 + 0x3F000)
 
-/* ASUS_BSP For upload crash log to DroBox issue */
+/* ASUS_BSP Paul +++ */
 #define LOGCAT_BUFFER           ((void *)((ulong)PRINTK_BUFFER_VA + (ulong)SZ_2M))
-#define LOGCAT_BUFFER_SIZE      (SZ_16K)
+#define LOGCAT_BUFFER_SIZE      (SZ_1M)
+/* ASUS_BSP Paul --- */
+
+// ASUS_BSP +++ Jiunhau_Wang [ZE620KL][Dropbox][NA][NA] /asdf/last_kmsg_16K
 #define LAST_KMSG_SIZE          (SZ_16K)
-/* ASUS_BSP --- */
+// ASUS_BSP --- Jiunhau_Wang [ZE620KL][Dropbox][NA][NA] /asdf/last_kmsg_16K
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 ////                  Eventlog mask mechanism
@@ -73,4 +76,3 @@ void SubSysHealthRecord(const char *fmt, ...);/*ASUS-BBSP SubSys Health Record+*
 //20101202_Bruno: added to get debug mask value
 bool isASUS_MSK_set(const char *fmt);
 #endif
-void write_magic_number(void);

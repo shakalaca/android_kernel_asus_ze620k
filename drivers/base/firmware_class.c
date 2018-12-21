@@ -375,6 +375,12 @@ static int fw_get_filesystem_firmware(struct device *device,
 	char *path;
 	/* ASUS BSP : For Change ADSP FW loading path to vendor/firmware +++*/
 	char fw_name[5];
+	bool is_ADSP_readed = false;
+	/* ASUS BSP ---*/
+
+	/* ASUS BSP : For Change Venus FW loading path to vendor/firmware +++*/
+	char v_fw_name[6];
+	bool is_venus_readed = false;
 	/* ASUS BSP ---*/
 
 	path = __getname();
@@ -397,9 +403,81 @@ static int fw_get_filesystem_firmware(struct device *device,
 
 		/* ASUS BSP : For Change ADSP FW loading path to vendor/firmware */
 		snprintf(fw_name, 5, "%s", buf->fw_id);
-		if (!strcmp(fw_name, "adsp")  && i == 1 ) {			
-			snprintf(path, PATH_MAX, "%s/%s", "vendor/firmware/q6_sdm636_image", buf->fw_id);
-			dev_err(device, "[ADSP] Try to load firmware : %s \n", path);
+		if (!strcmp(fw_name, "adsp")  &&  is_ADSP_readed == false ) {
+			if (!strcmp(buf->fw_id, "adsp.mdt"))    {
+				/*****************************
+				 * ZE620KL_636_PRJ_ID = 0x6
+				 * ZE554KL_630_PRJ_ID = 0x7
+				 * ZE554KL_660_PRJ_ID = 0x5
+				 * ZC600KL_630_PRJ_ID = 0xA
+				 *****************************/
+				if ( g_ASUS_prjID == 0x6)
+					dev_err(device, "[ADSP] This ZE620KL project is : SDM636(0x%x) \n", g_ASUS_prjID);
+				else if ( g_ASUS_prjID == 0x7 )
+					dev_err(device, "[ADSP] This ZE554KL project is : SDM630(0x%x) \n", g_ASUS_prjID);
+				else if ( g_ASUS_prjID == 0x5 )
+					dev_err(device, "[ADSP] This ZE554KL project is : SDM660(0x%x) \n", g_ASUS_prjID);
+				else if ( g_ASUS_prjID == 0xA )
+					dev_err(device, "[ADSP] This ZC600KL project is : SDM630(0x%x) \n", g_ASUS_prjID);
+				else
+					dev_err(device, "[ADSP] Unknown project(0x%x) \n", g_ASUS_prjID);
+			}
+			if ( g_ASUS_prjID == 0x6)	{
+				is_ADSP_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/q6_sdm636_image", buf->fw_id);
+				dev_err(device, "[ADSP] Try to load firmware : %s \n", path);
+			}
+			else if ( g_ASUS_prjID == 0x7 )     {
+				is_ADSP_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/q6_Sdm630_image", buf->fw_id);
+				dev_err(device, "[ADSP] Try to load firmware : %s \n", path);
+			}
+			else if ( g_ASUS_prjID == 0x5 )        {
+				is_ADSP_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/q6_Sdm660_image", buf->fw_id);
+				dev_err(device, "[ADSP] Try to load firmware : %s \n", path);
+			}
+			else if ( g_ASUS_prjID == 0xA )        {
+				is_ADSP_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/q6_zc600kl_sdm630_image", buf->fw_id);
+				dev_err(device, "[ADSP] Try to load firmware : %s \n", path);
+			}
+		}
+		/* ASUS BSP ---*/
+
+		/* ASUS BSP : For Change Venus FW loading path to vendor/firmware */
+		snprintf(v_fw_name, 6, "%s", buf->fw_id);
+		if (!strcmp(v_fw_name, "venus")  &&  is_venus_readed == false ) {
+			if (!strcmp(buf->fw_id, "venus.mdt"))    {
+				/*****************************
+				 * ZE620KL_636_PRJ_ID = 0x6
+				 * ZE554KL_630_PRJ_ID = 0x7
+				 * ZE554KL_660_PRJ_ID = 0x5
+				 *****************************/
+				if ( g_ASUS_prjID == 0x6)
+					dev_err(device, "[Venus] This ZE620KL project is : SDM636(0x%x) \n", g_ASUS_prjID);
+				else if ( g_ASUS_prjID == 0x07 )
+					dev_err(device, "[Venus] This ZE554KL project is : SDM630(0x%x) \n", g_ASUS_prjID);
+				else if ( g_ASUS_prjID == 0x05 )
+					dev_err(device, "[Venus] This ZE554KL project is : SDM660(0x%x) \n", g_ASUS_prjID);
+				else
+					dev_err(device, "[Venus] Unknown project(0x%x) \n", g_ASUS_prjID);
+			}
+			if ( g_ASUS_prjID == 0x6)	{
+				is_venus_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/", buf->fw_id);
+				dev_err(device, "[Venus] Try to load firmware : %s \n", path);
+			}
+			else if ( g_ASUS_prjID == 0x07 )	{
+				is_venus_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/sdm630", buf->fw_id);
+				dev_err(device, "[Venus] Try to load firmware : %s \n", path);
+			}
+			else if ( g_ASUS_prjID == 0x05 )	{
+				is_venus_readed = true;
+				snprintf(path, PATH_MAX, "%s/%s", "/system/vendor/firmware/sdm660", buf->fw_id);
+				dev_err(device, "[Venus] Try to load firmware : %s \n", path);
+			}
 		}
 		/* ASUS BSP ---*/
 
@@ -1124,7 +1202,7 @@ static int _request_firmware_load(struct firmware_priv *fw_priv,
 		timeout = MAX_JIFFY_OFFSET;
 	}
 
-	timeout = wait_for_completion_killable_timeout(&buf->completion,
+	timeout = wait_for_completion_interruptible_timeout(&buf->completion,
 			timeout);
 	if (timeout == -ERESTARTSYS || !timeout) {
 		retval = timeout;
@@ -1159,7 +1237,7 @@ static int fw_load_from_user_helper(struct firmware *firmware,
 	return _request_firmware_load(fw_priv, desc->opt_flags, timeout);
 }
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_FW_CACHE
 /* kill pending requests without uevent to avoid blocking suspend */
 static void kill_requests_without_uevent(void)
 {
@@ -1637,7 +1715,7 @@ request_firmware_nowait_into_buf(
 }
 EXPORT_SYMBOL_GPL(request_firmware_nowait_into_buf);
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_FW_CACHE
 static ASYNC_DOMAIN_EXCLUSIVE(fw_cache_domain);
 
 /**
@@ -1983,7 +2061,7 @@ static void __init fw_cache_init(void)
 	INIT_LIST_HEAD(&fw_cache.head);
 	fw_cache.state = FW_LOADER_NO_CACHE;
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_FW_CACHE
 	spin_lock_init(&fw_cache.name_lock);
 	INIT_LIST_HEAD(&fw_cache.fw_names);
 
@@ -2010,7 +2088,7 @@ static int __init firmware_class_init(void)
 
 static void __exit firmware_class_exit(void)
 {
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_FW_CACHE
 	unregister_syscore_ops(&fw_syscore_ops);
 	unregister_pm_notifier(&fw_cache.pm_notify);
 #endif

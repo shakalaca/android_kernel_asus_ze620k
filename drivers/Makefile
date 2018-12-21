@@ -97,6 +97,7 @@ obj-$(CONFIG_TC)		+= tc/
 obj-$(CONFIG_UWB)		+= uwb/
 obj-$(CONFIG_USB_PHY)		+= usb/
 obj-$(CONFIG_USB)		+= usb/
+obj-$(CONFIG_USB_SUPPORT)	+= usb/
 obj-$(CONFIG_PCI)		+= usb/
 obj-$(CONFIG_USB_GADGET)	+= usb/
 obj-$(CONFIG_OF)		+= usb/
@@ -182,26 +183,12 @@ obj-$(CONFIG_BIF)		+= bif/
 
 obj-$(CONFIG_SENSORS_SSC)	+= sensors/
 obj-$(CONFIG_ESOC)              += esoc/
+obj-$(CONFIG_TEE)		+= tee/
 
-#Texura
-ifdef CONFIG_TUXERA_ARM64
+#Tuxera
 	ifdef CONFIG_TUXERA_USERDEBUG
-#	obj-y				+= ntfs/userdebug/64/objects/
-	obj-y				+= exfat/userdebug/64/objects/
+		obj-y				+= exfat/ze620kl/userdebug/
 	else
-#	obj-y				+= ntfs/user/64/objects/
-	obj-y				+= exfat/user/64/objects/
+		obj-y				+= exfat/ze620kl/user/
 	endif
-else
-	ifdef CONFIG_TUXERA_USERDEBUG
-#	obj-y				+= ntfs/userdebug/32/objects/
-#	obj-y				+= exfat/userdebug/32/objects/
-	else
-#	obj-y				+= ntfs/user/32/objects/
-#	obj-y				+= exfat/user/32/objects/
-	endif
-endif
 
-# DTS_EAGLE START
-obj-y                           += dts_eagle/
-# DTS_EAGLE END

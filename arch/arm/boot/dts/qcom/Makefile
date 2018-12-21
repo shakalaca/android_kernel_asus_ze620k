@@ -32,6 +32,7 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	msm8996pro-auto-adp.dtb \
 	msm8996pro-auto-adp-lite.dtb \
 	msm8996pro-auto-cdp.dtb \
+	msm8996pro-auto-cv2x.dtb \
 	msm8996pro-pmi8994-cdp.dtb \
 	msm8996pro-pmi8994-mtp.dtb \
 	msm8996pro-pmi8994-pmk8001-cdp.dtb \
@@ -112,9 +113,14 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	apq8096-v3-pmi8994-mdm9x55-slimbus-mtp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-i2s-mtp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-slimbus-mtp.dtb \
-	apq8096-v3-pmi8996-dragonboard.dtb
+	apq8096-v3-pmi8996-dragonboard.dtb \
+	msm8996-auto-mizar.dtb
 
-dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996.dtb
+dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996-telematics.dtb \
+	vplatform-lfv-msm8996-ivi.dtb \
+	vplatform-lfv-msm8996-baseline.dtb \
+	vplatform-lfv-msm8996-ivi-la.dtb \
+	vplatform-lfv-msm8996-ivi-lv-mt.dtb
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_MSM8998) += \
@@ -171,10 +177,7 @@ dtb-$(CONFIG_ARCH_MSM8998) += msm8998-sim.dtb \
 	apq8098-v2.1-svr20.dtb \
 	msm8998-v2.1-interposer-sdm660-cdp.dtb \
 	msm8998-v2.1-interposer-sdm660-mtp.dtb \
-	msm8998-v2.1-interposer-sdm660-qrd.dtb \
-	msm8998-9x55-rcm.dtb \
-	msm8998-9x55-cdp.dtb \
-	msm8998-9x55-mtp.dtb
+	msm8998-v2.1-interposer-sdm660-qrd.dtb
 endif
 
 dtb-$(CONFIG_ARCH_MSMHAMSTER) += msmhamster-rumi.dtb
@@ -183,8 +186,6 @@ dtb-$(CONFIG_ARCH_SDM660) += \
 	sdm660-cdp.dtb \
 	sdm660-mtp.dtb \
 	sdm660-qrd.dtb \
-	ara-sr-sdm636-qrd.dtb \
-	ara-sr-oc-sdm636-qrd.dtb \
 	ara-er-sdm636-qrd.dtb \
 	ara-er-oc-sdm636-qrd.dtb
 

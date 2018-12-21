@@ -476,7 +476,6 @@ unsigned int emmc_get_erase_count(struct mmc_card *card)
 }
 EXPORT_SYMBOL_GPL(emmc_get_erase_count);
 //ASUS_BSP PeterYeh : get Hynix eMMC erase count ---
-
 int mmc_spi_read_ocr(struct mmc_host *host, int highcap, u32 *ocrp)
 {
 	struct mmc_command cmd = {0};

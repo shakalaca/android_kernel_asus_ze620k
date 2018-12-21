@@ -40,7 +40,7 @@
 *****************************************************************************/
 u8 uc_tp_fm_ver;
 EXPORT_SYMBOL(uc_tp_fm_ver);
-extern int g_asus_lcdID;
+int g_asus_lcdID2 = 1;
 struct ft_chip_t chip_types = FTS_CHIP_TYPE_MAPPING;
 
 struct fts_Upgrade_Info fts_updateinfo[] =
@@ -642,7 +642,7 @@ int fts_getsize(u8 fw_type)
 #if ((FTS_CHIP_TYPE == _FT8716) || (FTS_CHIP_TYPE == _FT8736) || (FTS_CHIP_TYPE == _FT8607))
     if (fw_type == FW_SIZE)
     {
-		if (g_asus_lcdID == 2)
+		if (g_asus_lcdID2 == 2)
         fw_len = sizeof(CTPM_FW);
 		else
 			fw_len = sizeof(CTPM_FW_ARA);
@@ -658,7 +658,7 @@ int fts_getsize(u8 fw_type)
 #else
     if (fw_type == FW_SIZE)
     {
-		if (g_asus_lcdID == 2)
+		if (g_asus_lcdID2 == 2)
         fw_len = sizeof(CTPM_FW);
 		else
 			fw_len = sizeof(CTPM_FW_ARA);

@@ -1014,7 +1014,6 @@ temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 
 	return sprintf(buf, "%d\n", temperature);
 }
-
 /* ASUS_BSP (ShowCai) +++ For ATD parser format */
 static ssize_t
 mtemp_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1036,6 +1035,7 @@ mtemp_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return sprintf(buf, "%ld\n", mtemperature);
 }
 /* ASUS_BSP (ShowCai) --- Show For ATD parser format */
+	
 
 static ssize_t
 mode_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -2342,7 +2342,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 	result = device_create_file(&tz->device, &dev_attr_temp);
 	if (result)
 		goto unregister;
-		
 	/* ASUS_BSP (ShowCai) +++ For ATD parser format */
 	result = device_create_file(&tz->device, &dev_attr_mtemp);
 	if (result)

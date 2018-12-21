@@ -13,22 +13,21 @@
  */
 
 /*******************************/
-/* IR Sensor Hardware Module */
+/* ALSPS Sensor Hardware Module */
 /******************************/
-#ifndef __LINUX_IRSENSOR_HARDWARE_H
-#define __LINUX_IRSENSOR_HARDWARE_H
+#ifndef __LINUX_ALSPS_HARDWARE_H
+#define __LINUX_ALSPS_HARDWARE_H
 
 /****************************/
-/* IR Sensor Configuration */
+/* ALSPS Sensor Configuration */
 /**************************/
 enum hardware_source {
-	IRsensor_hw_source_cm36656=0,
-	IRsensor_hw_source_max,
+	ALSPS_hw_source_cm36686=0,
+	ALSPS_hw_source_max,
 };
 
 #include <linux/input/ASH.h>
-extern IRsensor_hw* IRsensor_hw_cm36686_getHardware(void);
-extern IRsensor_hw* IRsensor_hw_cm36656_getHardware(void);
-extern IRsensor_hw* IRsensor_hw_ap3045_getHardware(void);
+extern ALSPS_hw* ALSPS_hw_cm36686_getHardware(void);
+extern ALSPS_hw* ALSPS_hw_ap3045_getHardware(void);
 #endif
 

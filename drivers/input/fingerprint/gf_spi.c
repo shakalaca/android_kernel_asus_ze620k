@@ -70,6 +70,9 @@ static int SPIDEV_MAJOR;
 // add for touch driver for titan
 bool g_FP_Disable_Touch = false;
 
+// add for charger mode
+extern bool g_Charger_mode;
+
 static DECLARE_BITMAP(minors, N_SPI_MINORS);
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
@@ -801,7 +804,13 @@ static int gf_probe(struct platform_device *pdev)
 		pr_err("[GDX_FP] failed to request IRQ:%d\n", gf_dev->irq);
 		goto err_irq;
 	}
-	enable_irq_wake(gf_dev->irq);
+		
+	// if boot into charger mode, disable irq wakeup
+	if (!g_Charger_mode){
+		pr_info("[GDX_FP] boot. enable irq wake.\n");
+		enable_irq_wake(gf_dev->irq);
+	}
+	
 	gf_dev->irq_enabled = 1;
 	gf_disable_irq(gf_dev);
 

@@ -681,8 +681,6 @@ static ssize_t tfa98xx_dbgfs_fw_state_get(struct file *file,
 	return simple_read_from_buffer(user_buf, count, ppos, str, strlen(str));
 }
 
-extern int send_tfa_cal_apr(void *buf, int cmd_size, bool bRead);
-
 static ssize_t tfa98xx_dbgfs_rpc_read(struct file *file,
 				     char __user *user_buf, size_t count,
 				     loff_t *ppos)
@@ -691,20 +689,27 @@ static ssize_t tfa98xx_dbgfs_rpc_read(struct file *file,
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(i2c);
 	int ret = 0;
 	uint8_t *buffer;
+	enum Tfa98xx_Error error;
+
+	if (tfa98xx->tfa == NULL) {
+		pr_debug("[0x%x] dsp is not available\n", tfa98xx->i2c->addr);
+		return -ENODEV;
+	}
+
+	if (count == 0)
+		return 0;
 
 	buffer = kmalloc(count, GFP_KERNEL);
 	if (buffer == NULL) {
-		pr_err("[0x%x] can not allocate memory\n", i2c->addr);
+		pr_debug("[0x%x] can not allocate memory\n", tfa98xx->i2c->addr);
 		return -ENOMEM;
 	}
 
 	mutex_lock(&tfa98xx->dsp_lock);
-
-	ret = send_tfa_cal_apr(buffer, count, true);
-
+	error = dsp_msg_read(tfa98xx->tfa, count, buffer);
 	mutex_unlock(&tfa98xx->dsp_lock);
-	if (ret) {
-		pr_err("[0x%x] dsp_msg_read error: %d\n", i2c->addr, ret);
+	if (error != Tfa98xx_Error_Ok) {
+		pr_debug("[0x%x] dsp_msg_read error: %d\n", tfa98xx->i2c->addr, error);
 		kfree(buffer);
 		return -EFAULT;
 	}
@@ -724,33 +729,46 @@ static ssize_t tfa98xx_dbgfs_rpc_send(struct file *file,
 {
 	struct i2c_client *i2c = file->private_data;
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(i2c);
-	uint8_t *buffer;
+	nxpTfaFileDsc_t *msg_file;
+	enum Tfa98xx_Error error;
 	int err = 0;
+
+	if (tfa98xx->tfa == NULL) {
+		pr_debug("[0x%x] dsp is not available\n", tfa98xx->i2c->addr);
+		return -ENODEV;
+	}
 
 	if (count == 0)
 		return 0;
 
 	/* msg_file.name is not used */
-	buffer = kmalloc(count, GFP_KERNEL);
-	if ( buffer == NULL ) {
-		pr_err("[0x%x] can not allocate memory\n", i2c->addr);
+	msg_file = kmalloc(count + sizeof(nxpTfaFileDsc_t), GFP_KERNEL);
+	if ( msg_file == NULL ) {
+		pr_debug("[0x%x] can not allocate memory\n", tfa98xx->i2c->addr);
 		return  -ENOMEM;
 	}
-	if (copy_from_user(buffer, user_buf, count))
+	msg_file->size = count;
+
+	if (copy_from_user(msg_file->data, user_buf, count))
 		return -EFAULT;
 
 	mutex_lock(&tfa98xx->dsp_lock);
-
-	err = send_tfa_cal_apr(buffer, count, false);
-	if (err) {
-		pr_err("[0x%x] dsp_msg error: %d\n", i2c->addr, err);
+	if ((msg_file->data[0] == 'M') && (msg_file->data[1] == 'G')) {
+		error = tfaContWriteFile(tfa98xx->tfa, msg_file, 0, 0); /* int vstep_idx, int vstep_msg_idx both 0 */
+		if (error != Tfa98xx_Error_Ok) {
+			pr_debug("[0x%x] tfaContWriteFile error: %d\n", tfa98xx->i2c->addr, error);
+			err = -EIO;
+		}
+	} else {
+		error = dsp_msg(tfa98xx->tfa, msg_file->size, msg_file->data);
+		if (error != Tfa98xx_Error_Ok) {
+			pr_debug("[0x%x] dsp_msg error: %d\n", tfa98xx->i2c->addr, error);
+			err = -EIO;
+		}
 	}
-
-	mdelay(2);
-
 	mutex_unlock(&tfa98xx->dsp_lock);
 
-	kfree(buffer);
+	kfree(msg_file);
 
 	if (err)
 		return err;
@@ -2562,12 +2580,21 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
 	unsigned int rate;
 	int prof_idx;
+	/****  Reduce audio tfa98xx log  ****/
+	int sample_size = 0;
+	int physical_size = 0;
 
 	/* Supported */
 	rate = params_rate(params);
+
+	/****  Reduce audio tfa98xx log  ****/
+	sample_size = snd_pcm_format_width(params_format(params));
+	physical_size = snd_pcm_format_physical_width(params_format(params));
+	/*
 	pr_debug("Requested rate: %d, sample size: %d, physical size: %d\n",
 			rate, snd_pcm_format_width(params_format(params)),
 			snd_pcm_format_physical_width(params_format(params)));
+	*/
 
 	if (no_start != 0)
 		return 0;
@@ -2578,7 +2605,10 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 		pr_err("tfa98xx: invalid sample rate %d.\n", rate);
 		return -EINVAL;
 	}
-	pr_debug("mixer profile:container profile = [%d:%d]\n", tfa98xx_mixer_profile, prof_idx);
+
+	/****  Reduce audio tfa98xx log  ****/
+	pr_debug("Requested rate: %d, sample size: %d, physical size: %d, mixer profile:container profile = [%d:%d]\n", 
+				rate, sample_size, physical_size, tfa98xx_mixer_profile, prof_idx);
 
 
 	/* update 'real' profile (container profile) */
@@ -2668,7 +2698,12 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 	struct snd_soc_codec *codec = dai->codec;
 	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
 
-	dev_dbg(&tfa98xx->i2c->dev, "%s: state: %d\n", __func__, mute);
+	/****  Reduce audio tfa98xx log  ****/
+	if (tfa98xx->lost_mute_state != mute)
+		dev_dbg(&tfa98xx->i2c->dev, "%s: state: %d, lost mute state: %d\n", __func__, mute, tfa98xx->lost_mute_state);
+
+	/****  member mute state for reduce audio tfa98xx log  ****/
+	tfa98xx->lost_mute_state = mute;
 
 	if (no_start) {
 		pr_debug("no_start parameter set no tfa_dev_start or tfa_dev_stop, returning\n");
@@ -3008,6 +3043,9 @@ retry:
 	return ((ret > 1) ? count : -EIO);
 }
 
+
+extern int send_tfa_cal_apr(void *buf, int cmd_size, bool bRead);
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 +++ */
 static ssize_t tfa98xx_misc_rpc_read(struct file *file,
 				     char __user *user_buf, size_t count,
 				     loff_t *ppos)
@@ -3026,6 +3064,7 @@ static ssize_t tfa98xx_misc_rpc_read(struct file *file,
 	//mutex_lock(&tfa98xx->dsp_lock);
 
 	ret = send_tfa_cal_apr(buffer, count, true);
+	pr_err("[0x%x] send_tfa_cal_apr error: %d\n", i2c->addr, ret);
 
 	//mutex_unlock(&tfa98xx->dsp_lock);
 	if (ret) {
@@ -3067,8 +3106,8 @@ static ssize_t tfa98xx_misc_rpc_send(struct file *file,
 	//mutex_lock(&tfa98xx->dsp_lock);
 
 	err = send_tfa_cal_apr(buffer, count, false);
-	if (err) {
-		pr_err("[0x%x] dsp_msg error: %d\n", i2c->addr, err);
+	if (1) {
+		pr_err("[0x%x] send_tfa_cal_apr error: %d\n", i2c->addr, err);
 	}
 
 	mdelay(2);
@@ -3081,6 +3120,7 @@ static ssize_t tfa98xx_misc_rpc_send(struct file *file,
 		return err;
 	return count;
 }
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 --- */
 
 static struct bin_attribute dev_attr_rw = {
 	.attr = {
@@ -3102,6 +3142,7 @@ static struct bin_attribute dev_attr_reg = {
 	.write = tfa98xx_reg_write,
 };
 
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 +++ */
 static const struct file_operations tfa98xx_misc_rpc_fops = {
 	.owner = THIS_MODULE,
 	.open = simple_open,
@@ -3121,6 +3162,7 @@ struct miscdevice tfa98xx_rpc_misc35 = {
 	.name = "ASUS_rpc_35",
 	.fops = &tfa98xx_misc_rpc_fops,
 };
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 --- */
 
 static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			     const struct i2c_device_id *id)
@@ -3148,6 +3190,9 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	tfa98xx->dsp_init = TFA98XX_DSP_INIT_STOPPED;
 	tfa98xx->rate = 48000; /* init to the default sample rate (48kHz) */
 	tfa98xx->tfa = NULL;
+
+	/****  init lost_mute_state for reduce audio tfa98xx log  ****/
+	tfa98xx->lost_mute_state = -1;
 
 	tfa98xx->regmap = devm_regmap_init_i2c(i2c, &tfa98xx_regmap);
 	if (IS_ERR(tfa98xx->regmap)) {
@@ -3331,6 +3376,7 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	if (ret)
 		dev_info(&i2c->dev, "error creating sysfs files\n");
 
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 +++ */
 	if (i2c->addr == 0x35)	{
 		dev_info(&i2c->dev, "tfa98xx try to registered misc_register(%s)\n", tfa98xx_rpc_misc34.name);
 		ret = misc_register(&tfa98xx_rpc_misc34);
@@ -3342,6 +3388,7 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 		if (ret)
 			dev_info(&i2c->dev, "error creating miscfs files\n");
 	}
+/* For CSC check&self calibration Receiver & Speaker for userversion 20180821 --- */
 
 	pr_info("%s Probe completed successfully!\n", __func__);
 

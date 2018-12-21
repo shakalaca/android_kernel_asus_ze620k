@@ -229,6 +229,7 @@ struct dentry_operations {
 #define DCACHE_MAY_FREE			0x00800000
 #define DCACHE_FALLTHRU			0x01000000 /* Fall through to lower layer */
 #define DCACHE_OP_SELECT_INODE		0x02000000 /* Unioned entry: dcache op selects inode */
+#define DCACHE_ENCRYPTED_WITH_KEY	0x04000000 /* dir is encrypted with a valid key */
 #define DCACHE_OP_REAL			0x08000000
 
 extern seqlock_t rename_lock;
@@ -284,7 +285,7 @@ extern void d_rehash(struct dentry *);
  * This adds the entry to the hash queues and initializes @inode.
  * The entry was actually filled in earlier during d_alloc().
  */
-
+ 
 static inline void d_add(struct dentry *entry, struct inode *inode)
 {
 	d_instantiate(entry, inode);
@@ -347,7 +348,7 @@ extern char *dentry_path(struct dentry *, char *, int);
  *	@dentry: dentry to get a reference to
  *
  *	Given a dentry or %NULL pointer increment the reference count
- *	if appropriate and return the dentry. A dentry will not be
+ *	if appropriate and return the dentry. A dentry will not be 
  *	destroyed when it has references.
  */
 static inline struct dentry *dget_dlock(struct dentry *dentry)
@@ -372,7 +373,7 @@ extern struct dentry *dget_parent(struct dentry *dentry);
  *
  *	Returns true if the dentry passed is not currently hashed.
  */
-
+ 
 static inline int d_unhashed(const struct dentry *dentry)
 {
 	return hlist_bl_unhashed(&dentry->d_hash);

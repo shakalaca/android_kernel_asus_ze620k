@@ -29,6 +29,9 @@
 #include <linux/mfd/msm-cdc-pinctrl.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
+#ifdef ASUS_ZC600KL_PROJECT
+#include <linux/switch.h>
+#endif
 #include "wcd-mbhc-v2.h"
 #include "wcdcal-hwdep.h"
 
@@ -46,8 +49,15 @@ static struct wake_lock hook_key_wake_lock;
 				  SND_JACK_BTN_2 | SND_JACK_BTN_3 | \
 				  SND_JACK_BTN_4 | SND_JACK_BTN_5 )
 #define OCP_ATTEMPT 20
+
+#ifdef ASUS_ZC600KL_PROJECT
+#define HS_DETECT_PLUG_TIME_MS (1000)
+#define SPECIAL_HS_DETECT_TIME_MS (100)
+#else
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
+#endif
+
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
 #define GND_MIC_SWAP_THRESHOLD 4
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
@@ -73,6 +83,10 @@ extern int g_DebugMode;
 uint32_t g_ZL = 0;
 uint32_t g_ZR = 0;
 /* ASUS_BSP Eric ---*/
+
+#ifdef ASUS_ZC600KL_PROJECT
+static struct switch_dev mbhc_data;
+#endif
 
 static int det_extn_cable_en;
 module_param(det_extn_cable_en, int,
@@ -699,11 +713,23 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 {
 	struct snd_soc_codec *codec = mbhc->codec;
 	bool is_pa_on = false;
+#ifdef ASUS_ZC600KL_PROJECT
+	int state = 0;
+#endif
 
 	WCD_MBHC_RSC_ASSERT_LOCKED(mbhc);
 
 	pr_debug("%s: enter insertion %d hph_status %x\n",
 		 __func__, insertion, mbhc->hph_status);
+
+#ifdef ASUS_ZC600KL_PROJECT
+	if (insertion) {
+		state = (jack_type == SND_JACK_HEADPHONE) ? 1 : 3;
+	}
+
+	switch_set_state((struct switch_dev *)&mbhc_data, state);
+#endif
+
 	if (!insertion) {
 		/* Report removal */
 		mbhc->hph_status &= ~jack_type;
@@ -836,9 +862,6 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			g_ZR = mbhc->zr;
 			printk("wcd_mbhc_v2 : print hs_imp_val : LL = %d , RR = %d\n",g_ZL, g_ZR);
 			/* ASUS_BSP Eric ---*/
-
-//Bruno++ Disable 3 pole extension cable
-#if 0
 			if ((mbhc->zl > mbhc->mbhc_cfg->linein_th &&
 				mbhc->zl < MAX_IMPED) &&
 				(mbhc->zr > mbhc->mbhc_cfg->linein_th &&
@@ -858,8 +881,6 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				pr_debug("%s: Marking jack type as SND_JACK_LINEOUT\n",
 				__func__);
 			}
-#endif
-//Bruno++ Disable 3 pole extension cable
 		}
 
 		mbhc->hph_status |= jack_type;
@@ -1094,8 +1115,14 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 			is_spl_hs = true;
 		}
 		if (delay == SPECIAL_HS_DETECT_TIME_MS) {
+#ifdef ASUS_ZC600KL_PROJECT
+			pr_debug("%s: Spl headset didnt get detect in 200ms\n",
+					__func__);
+			is_spl_hs = true;
+#else
 			pr_debug("%s: Spl headset didnt get detect in 4 sec\n",
 					__func__);
+#endif
 			break;
 		}
 	}
@@ -2736,9 +2763,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 		rc = of_property_read_u32(card->dev->of_node, usb_c_dt,
 				&mbhc_cfg->enable_usbc_analog);
 	}
-	/* ASUS_BSP +++ Diable USB C analog on ASUS ARA project */
-	mbhc_cfg->enable_usbc_analog = 0;
-
 	if (mbhc_cfg->enable_usbc_analog == 0 || rc != 0) {
 		dev_info(card->dev,
 				"%s: %s in dt node is missing or false\n",
@@ -3099,6 +3123,16 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 		goto err_hphr_ocp_irq;
 	}
 
+#ifdef ASUS_ZC600KL_PROJECT
+	mbhc_data.name = "h2w";
+	mbhc_data.index = 0;
+	mbhc_data.state = 0;
+	ret = switch_dev_register(&mbhc_data);
+	if (ret) {
+		pr_err("%s: Failed to register a switch device\n", __func__);
+	}
+#endif
+
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 	return ret;
 
@@ -3130,6 +3164,9 @@ void wcd_mbhc_deinit(struct wcd_mbhc *mbhc)
 {
 	struct snd_soc_codec *codec = mbhc->codec;
 
+#ifdef ASUS_ZC600KL_PROJECT
+	switch_dev_unregister(&mbhc_data);
+#endif
 	mbhc->mbhc_cb->free_irq(codec, mbhc->intr_ids->mbhc_sw_intr, mbhc);
 	mbhc->mbhc_cb->free_irq(codec, mbhc->intr_ids->mbhc_btn_press_intr,
 				mbhc);

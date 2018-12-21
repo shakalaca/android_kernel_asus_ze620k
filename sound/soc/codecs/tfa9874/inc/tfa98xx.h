@@ -132,6 +132,7 @@ struct tfa98xx {
 	unsigned int flags;
 	bool set_mtp_cal;
 	uint16_t cal_data;
+	int lost_mute_state;
 };
 
 

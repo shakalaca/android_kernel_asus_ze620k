@@ -326,10 +326,8 @@ static enum hrtimer_restart alarmtimer_fired(struct hrtimer *timer)
 	alarmtimer_dequeue(base, alarm);
 	spin_unlock_irqrestore(&base->lock, flags);
 
-	if (alarm->function) {
-		printk("%s: %pf\n", __func__, alarm->function);
+	if (alarm->function)
 		restart = alarm->function(alarm, base->gettime());
-	}
 
 	spin_lock_irqsave(&base->lock, flags);
 	if (restart != ALARMTIMER_NORESTART) {
@@ -544,7 +542,6 @@ void alarm_init(struct alarm *alarm, enum alarmtimer_type type,
 }
 EXPORT_SYMBOL_GPL(alarm_init);
 
-extern bool rtc_wake_control;
 /**
  * alarm_start - Sets an absolute alarm to fire
  * @alarm: ptr to alarm to set
@@ -554,9 +551,7 @@ void alarm_start(struct alarm *alarm, ktime_t start)
 {
 	struct alarm_base *base = &alarm_bases[alarm->type];
 	unsigned long flags;
-	if (rtc_wake_control) {
-		return;
-	}
+
 	spin_lock_irqsave(&base->lock, flags);
 	alarm->node.expires = start;
 	alarmtimer_enqueue(base, alarm);
@@ -853,7 +848,8 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 	 * Rate limit to the tick as a hot fix to prevent DOS. Will be
 	 * mopped up later.
 	 */
-	if (ktime_to_ns(timr->it.alarm.interval) < TICK_NSEC)
+	if (timr->it.alarm.interval.tv64 &&
+			ktime_to_ns(timr->it.alarm.interval) < TICK_NSEC)
 		timr->it.alarm.interval = ktime_set(0, TICK_NSEC);
 
 	exp = timespec_to_ktime(new_setting->it_value);

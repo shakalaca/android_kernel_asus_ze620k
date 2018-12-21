@@ -51,6 +51,7 @@
 * Global variable or extern global variabls/functions
 *****************************************************************************/
 extern u8 uc_tp_fm_ver;
+extern int g_asus_lcdID;
 static int fts_ctpm_get_app_i_file_ver(void);
 static int fts_ctpm_get_app_bin_file_ver(char *firmware_name);
 static int fts_ctpm_fw_upgrade_with_app_i_file(struct i2c_client *client);

@@ -85,7 +85,8 @@ void psensor_report_abs(int abs)
 {
 
 	if(abs != PSENSOR_REPORT_PS_AWAY &&
-		abs != PSENSOR_REPORT_PS_CLOSE) {
+		abs != PSENSOR_REPORT_PS_CLOSE &&
+		abs != PSENSOR_REPORT_PS_POCKET) {
 		if (abs != PSENSOR_INIT) {
 			err("%s: Proximity Detect Object ERROR.\n", __FUNCTION__);
 		}

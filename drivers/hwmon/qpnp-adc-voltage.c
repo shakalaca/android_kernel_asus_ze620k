@@ -2526,14 +2526,13 @@ static ssize_t qpnp_adc_show(struct device *dev,
 		pr_err("VADC read error with %d\n", rc);
 		return 0;
 	}
-
 	/* ASUS_BSP (ShowCai) +++ for ATD parser format */
 	sscanf(devattr->attr.name, "%s", tempbuf);
 	if (!strcmp(tempbuf, "asus_skin_therm") ||
-	    !strcmp(tempbuf, "asus_top_center_therm") ||
-	    !strcmp(tempbuf, "asus_bot_center_therm") ||
-	    !strcmp(tempbuf, "asus_pa_therm") ||
-	    !strcmp(tempbuf, "asus_pa_therm1")) {
+		!strcmp(tempbuf, "asus_top_center_therm") ||
+		!strcmp(tempbuf, "asus_bot_center_therm") ||
+		 !strcmp(tempbuf, "asus_pa_therm") ||
+		!strcmp(tempbuf, "asus_pa_therm1")) {
 		return snprintf(buf, QPNP_ADC_HWMON_NAME_LENGTH,
 		"%lld\n", result.physical*1000);
 	}

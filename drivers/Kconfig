@@ -212,6 +212,8 @@ source "drivers/bif/Kconfig"
 
 source "drivers/sensors/Kconfig"
 
+source "drivers/tee/Kconfig"
+
 config TUXERA_USERDEBUG
 	bool "Tuxera userdebug module for ASUS"
 	depends on NLS_UTF8
@@ -227,4 +229,5 @@ config TUXERA_ARM64
 	help
 	  Say Y here if you want support Tuxera userdebug module at QCOM ARM64
 	  Say N here if you want support Tuxera user module at ACOM ARM32
+
 endmenu

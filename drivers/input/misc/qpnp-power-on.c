@@ -30,26 +30,17 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/of_regulator.h>
-//#include <linux/qpnp/power-on.h>
-/*ASUS BSP Porting Debug*/
 unsigned int pwr_keycode ;
-/*ASUS BSP Porting Debug*/
-// ASUS_BSP +++
 u16 warm_reset_value;
 extern char evtlog_bootup_reason[100];
 extern char evtlog_poweroff_reason[100];
 extern char evtlog_warm_reset_reason[100];
-// ASUS_BSP ---
-// ASUS_BSP +++ for reset switch
-u64 reset_switch = 1;
-// ASUS_BSP --- for reset switch
+u64 reset_switch = 1; //for reset switch
 #ifdef CONFIG_PON_EVT_LOG
 extern char evtlog_pon_dump[100];
 #endif
-
 #include <linux/input/qpnp-power-on.h>
 #include <linux/power_supply.h>
-
 //+++ ASUS_BSP : set download mode cmdline
 extern int g_force_ramdump;
 #define CONFIG_FORCE_RAMDUMP	1
@@ -95,7 +86,9 @@ extern int g_force_ramdump;
 #define QPNP_PON_WARM_RESET_REASON2(pon)	((pon)->base + 0xB)
 #define QPNP_PON_OFF_REASON(pon)		((pon)->base + 0xC7)
 #define QPNP_FAULT_REASON1(pon)			((pon)->base + 0xC8)
+#ifdef CONFIG_PON_EVT_LOG
 #define QPNP_FAULT_REASON2(pon)			((pon)->base + 0xC9)
+#endif
 #define QPNP_S3_RESET_REASON(pon)		((pon)->base + 0xCA)
 #ifdef CONFIG_PON_EVT_LOG
 #define QPNP_SOFT_RESET_REASON1(pon)		((pon)->base + 0xCB)
@@ -987,42 +980,6 @@ qpnp_get_cfg(struct qpnp_pon *pon, u32 pon_type)
 	return NULL;
 }
 
-/* ASUS BSP freddy++ add node for side_key SMMI_Test */
-/* node: sys/module/intel_mid_powerbtn/parameter/pwrkey_mode */
-static int pwrkey_mode ;
-
-static int pwrkeyMode_function(const char *val, struct kernel_param *kp)
-{
-	int ret = 0;
-	int old_val = pwrkey_mode;
-
-	if (ret)
-		return ret;
-
-	if (pwrkey_mode > 0xf) {
-		pwrkey_mode = old_val;
-		return -EINVAL;
-	}
-
-	ret = param_set_int(val, kp);
-
-	if (pwrkey_mode == 0) {
-		pwr_keycode = KEY_POWER;
-		printk("[Keys][qpnp-power-on.c] Normal_Mode! \n");
-		printk("[Keys][qpnp-power-on.c] PwrKeyCode = %d\n", pwr_keycode);
-
-	} else if (pwrkey_mode == 1) {
-		pwr_keycode = KEY_A;
-		printk("[Keys][qpnp-power-on.c] Debug_Mode! \n");
-		printk("[Keys][qpnp-power-on.c] PwrKeyCode = %d\n", pwr_keycode);
-	}
-
-	return 0;
-}
-
-module_param_call(pwrkey_mode, pwrkeyMode_function, param_get_int, &pwrkey_mode, 0644);
-/* ASUS BSP freddy-- add node for side_key SMMI_Test */
-
 extern unsigned int b_press;
 
 /* ASUS_BSP + [ASDF]long press power key 6sec,reset device.. ++ */
@@ -1078,16 +1035,20 @@ void set_vib_enable(int value)
 }
 
 #define TIMEOUT_COUNT 55
+#define TIMEOUT_CLEAR 30
 static struct work_struct __wait_for_power_key_6s_work;
 static unsigned long press_time;
 static unsigned long slowlog_time;
+extern void rm_lastshut_slowg(void);
 
+static int saving_log = 0;
 static int slow_ok;
 void wait_for_power_key_6s_work(struct work_struct *work)
 {
 	static int power_key_6s_running = 0;
 	int i, duration;
 	unsigned long timeout, startime;
+	int j;
 
 	if (!power_key_6s_running) {
 		if (!is_holding_power_key())
@@ -1125,6 +1086,16 @@ void wait_for_power_key_6s_work(struct work_struct *work)
 // ASUS_BSP --- for reset switch
 		}
 
+		if ((i < TIMEOUT_COUNT) && (i >= TIMEOUT_CLEAR)) {
+			for (j = i; i < TIMEOUT_COUNT; j++) {
+				if (saving_log)
+					msleep(100);
+				else
+					break;
+			}
+			rm_lastshut_slowg();
+		}
+
 		power_key_6s_running = 0;
 	}
 }
@@ -1157,6 +1128,7 @@ void wait_for_slowlog_work(struct work_struct *work)
 
 		if (((i == TIMEOUT_SLOW) || time_after_eq(jiffies, timeout)) &&
 		    (is_holding_power_key()) && (i > 0)) {
+			saving_log = 1;
 			printk("start to gi chk\n");
 			duration = (jiffies - startime) * 10 / HZ;
 			printk("start to gi chk after power press %d.%d sec (%d)\n",
@@ -1173,6 +1145,7 @@ void wait_for_slowlog_work(struct work_struct *work)
 			slow_ok = 1;
 
 			get_last_shutdown_log();
+			saving_log = 0;
 
 #ifdef CONFIG_MSM_RTB
 			save_rtb_log();
@@ -1199,6 +1172,7 @@ void dump_log_work(struct work_struct *work)
 	call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
 
 }
+
 static int
 qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 {
@@ -1235,9 +1209,6 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 
 	switch (cfg->pon_type) {
 	case PON_KPDPWR:
-		/*+++ ASUS BSP Eric Porting Keypad for SR later+++*/
-		cfg->key_code = pwr_keycode;
-		/*+++ ASUS BSP Eric Porting Keypad for SR later+++*/
 		pon_rt_bit = QPNP_PON_KPDPWR_N_SET;
 
 		/* for phone hang debug */
@@ -1270,13 +1241,11 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		return -EINVAL;
 	}
 
-	printk("PMIC input: code=%d, sts=0x%hhx\n",
+	pr_debug("PMIC input: code=%d, sts=0x%hhx\n",
 					cfg->key_code, pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
 	printk("[Keys][qpnp-power-on.c] keycode=%d, state=%s\n",
 			cfg->key_code, key_status?"press":"release"); //ASUS BSP Vincent +++
- 
-
 
 	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
 		if (!key_status)
@@ -1580,16 +1549,13 @@ qpnp_config_reset(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 	}
 
 	/* enable S2 reset */
-// ASUS_BSP +++ for reset switch
-	if(reset_switch){
-		rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
-					QPNP_PON_S2_CNTL_EN, QPNP_PON_S2_CNTL_EN);
-		if (rc) {
-			dev_err(&pon->pdev->dev, "Unable to configure S2 enable\n");
-			return rc;
-		}
+	rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
+				QPNP_PON_S2_CNTL_EN, QPNP_PON_S2_CNTL_EN);
+	if (rc) {
+		dev_err(&pon->pdev->dev, "Unable to configure S2 enable\n");
+		return rc;
 	}
-// ASUS_BSP --- for reset switch
+
 	return 0;
 }
 
@@ -1699,15 +1665,7 @@ qpnp_pon_config_input(struct qpnp_pon *pon,  struct qpnp_pon_config *cfg)
 		pon->pon_input->phys = "qpnp_pon/input0";
 	}
 
-	/* don't send dummy release event when system resumes */
-	__set_bit(INPUT_PROP_NO_DUMMY_RELEASE, pon->pon_input->propbit);
-
-	/*ASUS BSP Porting keypad debug*/
-	input_set_capability(pon->pon_input, EV_KEY, KEY_POWER);
-	//input_set_capability(pon->pon_input, EV_KEY, cfg->key_code);
-	input_set_capability(pon->pon_input, EV_KEY, KEY_A);
-	pwr_keycode = KEY_POWER;
-	/*ASUS BSP Porting keypad debug*/
+	input_set_capability(pon->pon_input, EV_KEY, cfg->key_code);
 
 	return 0;
 }
@@ -1962,7 +1920,6 @@ static int qpnp_pon_config_init(struct qpnp_pon *pon)
 					"Incorrect S2 debounce time\n");
 				return -EINVAL;
 			}
-
 		#if CONFIG_FORCE_RAMDUMP
 			if(cfg->pon_type == PON_KPDPWR && g_force_ramdump) {
 				rc = 0;
@@ -1972,10 +1929,8 @@ static int qpnp_pon_config_init(struct qpnp_pon *pon)
 								&cfg->s2_type);
 			}
 		#else
-			// default code
 			rc = of_property_read_u32(pp, "qcom,s2-type",
 							&cfg->s2_type);
-
 		#endif
 			if (rc) {
 				dev_err(&pon->pdev->dev,
@@ -2337,15 +2292,7 @@ static int qpnp_pon_debugfs_uvlo_get(void *data, u64 *val)
 
 	return 0;
 }
-// ASUS_BSP +++ for reset switch
-static int qpnp_pon_reset_switch_get(void *data, u64 *val)
-{
 
-	*val = reset_switch;
-
-	return 0;
-}
-// ASUS_BSP --- for reset switch
 static int qpnp_pon_debugfs_uvlo_set(void *data, u64 val)
 {
 	struct qpnp_pon *pon = (struct qpnp_pon *) data;
@@ -2357,37 +2304,10 @@ static int qpnp_pon_debugfs_uvlo_set(void *data, u64 val)
 
 	return 0;
 }
-// ASUS_BSP +++ for reset switch
-static int qpnp_pon_reset_switch_set(void *data, u64 val)
-{
-    int rc = 0;
-    struct qpnp_pon *pon = (struct qpnp_pon *) data;
-    struct qpnp_pon_config *cfg;
-    int i ;
-
-    if (val == 1){
-        reset_switch = 1;
-    }else{
-        reset_switch = 0;
-    }
-
-    for (i = 0; i < pon->num_pon_config; i++) {
-        cfg = &pon->pon_cfg[i];
-        rc = qpnp_config_reset(pon, cfg);
-        if (rc) {
-            dev_err(&pon->pdev->dev,"Unable to config pon reset\n");
-        }
-    }
-    return 0;
-}
-// ASUS_BSP --- for reset switch
 
 DEFINE_SIMPLE_ATTRIBUTE(qpnp_pon_debugfs_uvlo_fops, qpnp_pon_debugfs_uvlo_get,
 			qpnp_pon_debugfs_uvlo_set, "0x%02llx\n");
-// ASUS_BSP +++ for reset switch
-DEFINE_SIMPLE_ATTRIBUTE(qpnp_pon_reset_switch, qpnp_pon_reset_switch_get,
-			qpnp_pon_reset_switch_set, "0x%02llx\n");
-// ASUS_BSP --- for reset switch
+
 static void qpnp_pon_debugfs_init(struct platform_device *pdev)
 {
 	struct qpnp_pon *pon = dev_get_drvdata(&pdev->dev);
@@ -2403,13 +2323,6 @@ static void qpnp_pon_debugfs_init(struct platform_device *pdev)
 		if (!ent)
 			dev_err(&pon->pdev->dev,
 				"Unable to create uvlo_panic debugfs file.\n");
-// ASUS_BSP +++ for reset switch
-		ent = debugfs_create_file("qpnp_pon_reset_switch", 0644,
-				pon->debugfs, pon, &qpnp_pon_reset_switch);
-		if (!ent)
-			dev_err(&pon->pdev->dev,
-				"Unable to create reset_switch debugfs file.\n");
-// ASUS_BSP --- for reset switch
 	}
 }
 
@@ -2570,7 +2483,6 @@ static int read_pon_registers(struct qpnp_pon *pon, u16 *on_poff_reason, u8 *pon
 	return 0;
 }
 #endif
-
 static int qpnp_pon_probe(struct platform_device *pdev)
 {
 	struct qpnp_pon *pon;
@@ -2594,7 +2506,6 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	u8 s3_src_reg;
 	unsigned long flags;
 	uint temp = 0;
-
 	printk("[Keys] qpnp_pon_probe()++\n");
 
 	pon = devm_kzalloc(&pdev->dev, sizeof(struct qpnp_pon), GFP_KERNEL);
@@ -2790,7 +2701,6 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		RecordPowerOffReason(pon,poff_sts,reason_index_offset); // ASUS_BSP +++
 		
 	}
-
 #ifdef CONFIG_PON_EVT_LOG
 	if (to_spmi_device(pon->pdev->dev.parent)->usid == SPMI_PM660) {
 		warm_reset_dump = (pon->warm_reset_reason1) | (pon->warm_reset_reason2 << 8);
@@ -2990,9 +2900,7 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 					"qcom,store-hard-reset-reason");
 
 	qpnp_pon_debugfs_init(pdev);
-
 	printk("[Keys] qpnp_pon_probe()--\n");
-
 	return 0;
 }
 

@@ -212,7 +212,6 @@ int fts_sensor_remove(struct fts_ts_data *data);
 extern struct i2c_client *fts_i2c_client;
 extern struct fts_ts_data *fts_wq_data;
 extern struct input_dev *fts_input_dev;
-
 //upgrade functions
 extern void fts_update_fw_vendor_id(struct fts_ts_data *data);
 extern void fts_update_fw_ver(struct fts_ts_data *data);

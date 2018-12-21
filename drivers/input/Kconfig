@@ -210,8 +210,6 @@ source "drivers/input/misc/Kconfig"
 
 source "drivers/input/fingerprint/Kconfig"
 
-source "drivers/input/side_fingerprint/Kconfig"
-
 endif
 
 menu "Hardware I/O ports"

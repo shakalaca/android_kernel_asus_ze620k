@@ -81,13 +81,14 @@
 #include <linux/integrity.h>
 #include <linux/proc_ns.h>
 #include <linux/io.h>
+#include <linux/kaiser.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
-
+#include <soc/qcom/boot_stats.h>
 static int kernel_init(void *);
 
 extern void init_IRQ(void);
@@ -128,8 +129,7 @@ static char *initcall_command_line;
 static char *execute_command;
 static char *ramdisk_execute_command;
 
-
-//+++ ASUS_BSP : miniporting : Add for audio dbg mode
+//+++ ASUS_BSP : Add for audio dbg mode
 int g_user_dbg_mode = 1;
 EXPORT_SYMBOL(g_user_dbg_mode);
 
@@ -162,68 +162,7 @@ static int set_ftm_mode(char *str)
     return 0;
 }
 __setup("androidboot.pre-ftm=", set_ftm_mode);
-//--- ASUS_BSP : miniporting : Add for audio dbg mode
-
-//ASUS_BSP Austin_T : add for kernel charger mode +++
-bool g_Charger_mode = false;
-static int set_charger_mode(char *str)
-{
-    if ( strcmp("charger", str) == 0 )
-        g_Charger_mode = true;
-    else
-        g_Charger_mode = false;
-
-    printk("g_Charger_mode = %d\n", g_Charger_mode);
-    return 0;
-}
-__setup("androidboot.mode=", set_charger_mode);
-EXPORT_SYMBOL(g_Charger_mode);
-//ASUS_BSP Austin_T : add for kernel charger mode ---
-
-//ASUS_BSP Austin_T : add for usb alert & low impedance status & water proof +++
-bool g_usb_alert_mode = false;
-static int set_usb_alert_mode(char *str)
-{
-    if ( strcmp("1", str) == 0 )
-        g_usb_alert_mode = true;
-    else
-        g_usb_alert_mode = false;
-
-    printk("g_usb_alert_mode = %d\n", g_usb_alert_mode);
-    return 0;
-}
-__setup("Therm.Alert=", set_usb_alert_mode);
-EXPORT_SYMBOL(g_usb_alert_mode);
-
-bool g_low_impedance_mode = false;
-static int set_low_impedance_mode(char *str)
-{
-    if ( strcmp("1", str) == 0 )
-        g_low_impedance_mode = true;
-    else
-        g_low_impedance_mode = false;
-
-    printk("g_low_impedance_mode = %d\n", g_low_impedance_mode);
-    return 0;
-}
-__setup("Low.IM=", set_low_impedance_mode);
-EXPORT_SYMBOL(g_low_impedance_mode);
-
-bool g_water_proof_mode = false;
-static int set_water_proof_mode(char *str)
-{
-    if ( strcmp("1", str) == 0 )
-        g_water_proof_mode = true;
-    else
-        g_water_proof_mode = false;
-
-    printk("g_water_proof_mode = %d\n", g_water_proof_mode);
-    return 0;
-}
-__setup("Water.PF=", set_water_proof_mode);
-EXPORT_SYMBOL(g_water_proof_mode);
-//ASUS_BSP Austin_T : add for usb alert & low impedance status & water proof ---
-
+//--- ASUS_BSP : Add for audio dbg mode
 /*
  * Used to generate warnings if static_key manipulation functions are used
  * before jump_label_init is called.
@@ -231,23 +170,7 @@ EXPORT_SYMBOL(g_water_proof_mode);
 bool static_key_initialized __read_mostly;
 EXPORT_SYMBOL_GPL(static_key_initialized);
 
-//+++ ASUS_BSP: parsing lcd unique id from aboot
-char lcd_unique_id[64] = {0};
-EXPORT_SYMBOL(lcd_unique_id);
-
-static int get_lcd_uniqueId(char *str)
-{
-    strncpy(lcd_unique_id, str, sizeof(lcd_unique_id));
-    printk("lcd_unique_id = %s\n ", lcd_unique_id);
-
-	return 0;
-}
-__setup("LCD=", get_lcd_uniqueId);
-
-//+++ ASUS_BSP : miniporting
-
-
-// ASUS_BSP +++ Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP +++ get permissive status
 int permissive_enable = 0;
 EXPORT_SYMBOL(permissive_enable);
 static int get_permissive_status(char *str)
@@ -262,8 +185,27 @@ static int get_permissive_status(char *str)
 	return 0;
 }
 __setup("androidboot.selinux=", get_permissive_status);
-// ASUS_BSP --- Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP --- get permissive status
 
+//// ASUS BSP WEIYU: CHARGER +++
+
+//weiyu: charger mode +++
+bool g_Charger_mode = false;
+static int set_charger_mode(char *str)
+{
+    if ( strcmp("charger", str) == 0 )
+        g_Charger_mode = true;
+    else
+        g_Charger_mode = false;
+
+    printk("g_Charger_mode = %d\n", g_Charger_mode);
+    return 0;
+}
+__setup("androidboot.mode=", set_charger_mode);
+EXPORT_SYMBOL(g_Charger_mode);
+// charger mode ---
+
+//// ASUS BSP WEIYU: CHARGER ---
 
 enum DEVICE_HWID g_ASUS_hwID=ZE620KL_UNKNOWN;
 
@@ -327,10 +269,10 @@ EXPORT_SYMBOL(g_ASUS_prjID);
 		g_ASUS_prjID = ZE620KL_636_PRJ_ID;
 		printk("Kernel PRJ ID = ZE620KL_636\n");
 	}
-	else if ( strcmp("4", str) == 0 )
+	else if ( strcmp("10", str) == 0 )
 	{
-		g_ASUS_prjID = ZE620KL_660_PRJ_ID;
-		printk("Kernel PRJ ID = ZE620KL_660\n");
+		g_ASUS_prjID = ZC600KL_630_PRJ_ID;
+		printk("Kernel PRJ ID = ZC600KL_630\n");
 	}
 	else
 	{
@@ -690,7 +632,7 @@ void __init __weak smp_setup_processor_id(void)
 }
 
 # if THREAD_SIZE >= PAGE_SIZE
-void __init __weak thread_info_cache_init(void)
+void __init __weak thread_stack_cache_init(void)
 {
 }
 #endif
@@ -711,6 +653,7 @@ static void __init mm_init(void)
 	pgtable_init();
 	vmalloc_init();
 	ioremap_huge_init();
+	kaiser_init();
 }
 
 asmlinkage __visible void __init start_kernel(void)
@@ -866,7 +809,7 @@ asmlinkage __visible void __init start_kernel(void)
 	/* Should be run before the first non-init thread is created */
 	init_espfix_bsp();
 #endif
-	thread_info_cache_init();
+	thread_stack_cache_init();
 	cred_init();
 	fork_init();
 	proc_caches_init();
@@ -986,15 +929,15 @@ static int __init_or_module do_one_initcall_debug(initcall_t fn)
 	int ret;
 
 	if (initcall_debug)
-		printk(KERN_DEBUG "calling  %pF @ %i\n", fn, task_pid_nr(current));
+	printk(KERN_DEBUG "calling  %pF @ %i\n", fn, task_pid_nr(current));
 	calltime = ktime_get();
 	ret = fn();
 	rettime = ktime_get();
 	delta = ktime_sub(rettime, calltime);
 	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
 	if (initcall_debug)
-		printk(KERN_DEBUG "initcall %pF returned %d after %lld usecs\n",
-			 fn, ret, duration);
+	printk(KERN_DEBUG "initcall %pF returned %d after %lld usecs\n",
+		 fn, ret, duration);
 
 	if (initcall_debug == 0) {
 		if (duration > 100000)
@@ -1189,6 +1132,7 @@ static int __ref kernel_init(void *unused)
 	numa_default_policy();
 
 	flush_delayed_fput();
+	place_marker("M : Kernel End");
 
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);

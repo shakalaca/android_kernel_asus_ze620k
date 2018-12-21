@@ -22,7 +22,7 @@
 #include <linux/proc_fs.h>
 
 #undef CDBG
-#define CDBG(fmt, args...) pr_err(fmt, ##args)
+#define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 DEFINE_MSM_MUTEX(msm_flash_mutex);
 
@@ -76,7 +76,7 @@ void msm_torch_brightness_set(struct led_classdev *led_cdev,
 
 	led_trigger_event(torch_trigger, value);
 };
-
+#ifdef ASUS_ZE620KL_PROJECT
 static struct led_classdev msm_torch_led[MAX_LED_TRIGGERS] = {
 	{
 		.name		= "torch-light0",
@@ -94,6 +94,30 @@ static struct led_classdev msm_torch_led[MAX_LED_TRIGGERS] = {
 		.brightness	= LED_OFF,
 	},
 };
+#endif
+
+#ifdef ASUS_ZC600KL_PROJECT
+
+static struct led_classdev msm_torch_led[MAX_LED_TRIGGERS] = {
+	{
+		.name		= "torch0_trigger", //bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+		.brightness_set	= msm_torch_brightness_set,
+		.brightness	= LED_OFF,
+	},
+	{
+		.name		= "torch1_trigger", //bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+		.brightness_set	= msm_torch_brightness_set,
+		.brightness	= LED_OFF,
+	},
+	{
+		.name		= "torch2_trigger", //bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+		.brightness_set	= msm_torch_brightness_set,
+		.brightness	= LED_OFF,
+	},
+};
+#endif
+
+#ifdef ASUS_ZE620KL_PROJECT
 
 static int32_t msm_torch_create_classdev(struct platform_device *pdev,
 				void *data)
@@ -131,7 +155,59 @@ static int32_t msm_torch_create_classdev(struct platform_device *pdev,
 
 	return 0;
 };
+#endif
+#ifdef ASUS_ZC600KL_PROJECT
+static int32_t msm_torch_create_classdev(struct platform_device *pdev,
+				void *data)
+{
+	//+bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+	int32_t rc = 0;
+	int32_t i = 0, j = 0;
+	struct msm_flash_ctrl_t *fctrl =
+		(struct msm_flash_ctrl_t *)data;
 
+	if (!fctrl) {
+		pr_err("Invalid fctrl\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < fctrl->torch_num_sources; i++) {
+		if (fctrl->torch_trigger[i]) {
+			torch_trigger = fctrl->torch_trigger[i];
+			for (j = 0; j < MAX_LED_TRIGGERS; j++) {
+				CDBG("%s:%d msm_torch_led[%d].name = %s\n",
+				__func__, __LINE__, j,msm_torch_led[j].name);
+				if (!strcmp(fctrl->torch_trigger[i]->name,msm_torch_led[j].name))
+				{	
+					CDBG("%s:%d msm_torch_led[%d].name = %s\n",
+				__func__, __LINE__, j,msm_torch_led[j].name);
+					break;
+				}
+				CDBG("%s:%d fctrl->torch_trigger[%d]->name=%s\n",
+				__func__, __LINE__, i,fctrl->torch_trigger[i]->name);
+			}
+			CDBG("%s:%d msm_torch_brightness_set for torch %d\n",
+				__func__, __LINE__, j);
+			msm_torch_brightness_set(&msm_torch_led[j],
+				LED_OFF);
+
+			rc = led_classdev_register(&pdev->dev,
+				&msm_torch_led[j]);
+			if (rc) {
+				pr_err("Failed to register %d led dev. rc = %d\n",
+						j, rc);
+				return rc;
+			}
+		} else {
+			pr_err("Invalid fctrl->torch_trigger[%d]\n", j);
+			return -EINVAL;
+		}
+		//-bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+	}
+
+	return 0;
+};
+#endif
 static int32_t msm_flash_get_subdev_id(
 	struct msm_flash_ctrl_t *flash_ctrl, void *arg)
 {
@@ -636,7 +712,7 @@ static int32_t msm_flash_low(
 		if (flash_ctrl->torch_trigger[i]) {
 			max_current = flash_ctrl->torch_max_current[i];
 			if (flash_data->flash_current[i] >= 0 &&
-				flash_data->flash_current[i] <=
+				flash_data->flash_current[i] <
 				max_current) {
 				curr = flash_data->flash_current[i];
 			} else {
@@ -673,7 +749,7 @@ static int32_t msm_flash_high(
 		if (flash_ctrl->flash_trigger[i]) {
 			max_current = flash_ctrl->flash_max_current[i];
 			if (flash_data->flash_current[i] >= 0 &&
-				flash_data->flash_current[i] <=
+				flash_data->flash_current[i] <
 				max_current) {
 				curr = flash_data->flash_current[i];
 			} else {
@@ -851,7 +927,7 @@ static long msm_flash_subdev_ioctl(struct v4l2_subdev *sd,
 	struct msm_flash_ctrl_t *fctrl = NULL;
 	void __user *argp = (void __user *)arg;
 
-	//CDBG("Enter\n");
+	CDBG("Enter\n");
 
 	if (!sd) {
 		pr_err("sd NULL\n");
@@ -885,7 +961,7 @@ static long msm_flash_subdev_ioctl(struct v4l2_subdev *sd,
 		pr_err_ratelimited("invalid cmd %d\n", cmd);
 		return -ENOIOCTLCMD;
 	}
-	//CDBG("Exit\n");
+	CDBG("Exit\n");
 }
 
 static struct v4l2_subdev_core_ops msm_flash_subdev_core_ops = {
@@ -1175,7 +1251,7 @@ static long msm_flash_subdev_do_ioctl(
 	struct msm_flash_init_info_t32 flash_init_info32;
 	struct msm_flash_init_info_t flash_init_info;
 
-	//CDBG("Enter");
+	CDBG("Enter");
 
 	if (!file || !arg) {
 		pr_err("%s:failed NULL parameter\n", __func__);
@@ -1236,7 +1312,7 @@ static long msm_flash_subdev_do_ioctl(
 		u32->flash_current[i] = flash_data.flash_current[i];
 		u32->flash_duration[i] = flash_data.flash_duration[i];
 	}
-	//CDBG("Exit");
+	CDBG("Exit");
 	return rc;
 }
 

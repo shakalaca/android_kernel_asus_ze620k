@@ -63,7 +63,6 @@
 
 #define CREATE_TRACE_POINTS
 #include "trace/lowmemorykiller.h"
-
 static bool trigger_dumpsys_meminfo = false;
 static unsigned long trigger_dumpsys_meminfo_time;
 static struct work_struct __dumpmem_work;
@@ -429,7 +428,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int other_file;
 
 	dumppid = 0;
-
 	if (!mutex_trylock(&scan_mutex))
 		return 0;
 
@@ -565,7 +563,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		if (selected_oom_score_adj < 100 && !trigger_dumpsys_meminfo) {
 			trigger_dumpsys_meminfo = true;
 		}
-
 		task_lock(selected);
 		send_sig(SIGKILL, selected, 0);
 		/*
@@ -580,7 +577,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		cache_limit = minfree * (long)(PAGE_SIZE / 1024);
 		free = other_free * (long)(PAGE_SIZE / 1024);
 		trace_lowmemory_kill(selected, cache_size, cache_limit, free);
-		lowmem_print(1, "Killing '%s' (%d), adj %hd,\n" \
+		lowmem_print(1, "Killing '%s' (%d) (tgid %d), adj %hd,\n" \
 			        "   to free %ldkB on behalf of '%s' (%d) because\n" \
 			        "   cache %ldkB is below limit %ldkB for oom_score_adj %hd\n" \
 				"   Free memory is %ldkB above reserved.\n" \
@@ -590,7 +587,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 				"   Total file cache is %ldkB\n" \
 				"   Total zcache is %ldkB\n" \
 				"   GFP mask is 0x%x\n",
-			     selected->comm, selected->pid,
+			     selected->comm, selected->pid, selected->tgid,
 			     selected_oom_score_adj,
 			     selected_tasksize * (long)(PAGE_SIZE / 1024),
 			     current->comm, current->pid,
@@ -631,7 +628,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		printk("[Vincent] start to schedule __keysavelog_work\n");
 		schedule_work(&__dumpmem_work);
 	}
-
 	lowmem_print(4, "lowmem_scan %lu, %x, return %lu\n",
 		     sc->nr_to_scan, sc->gfp_mask, rem);
 	mutex_unlock(&scan_mutex);
@@ -649,7 +645,7 @@ void dumpmem_func(struct work_struct *work)
 {
 	int ret = -1;
 	char buffer[8];
-	char cmdpath[] = "/system/vendor/bin/recvkernelevt";
+	char cmdpath[] = "/system/bin/recvkernelevt";
 	char *argv[8] = {cmdpath, "dumpmem",NULL};
 	char *envp[] = {"HOME=/", "PATH=/sbin:/system/bin:/system/sbin:/vendor/bin", NULL};
 	snprintf (buffer,7,"%d",dumppid);
@@ -658,14 +654,12 @@ void dumpmem_func(struct work_struct *work)
 	printk("[Debug+++] dumpsys meminfo on userspace\n");
 	ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
 	printk("[Debug---] dumpsys meminfo on userspace, ret = %d\n", ret);
-
 	return;
 }
-
 void dumpthread_func(struct work_struct *work)
 {
 	int ret = -1;
-	char cmdpath[] = "/system/vendor/bin/recvkernelevt";
+	char cmdpath[] = "/system/bin/recvkernelevt";
 	char *argv[8] = {cmdpath, "dumpbusythread",NULL};
 	char *envp[] = {"HOME=/", "PATH=/sbin:/system/bin:/system/sbin:/vendor/bin", NULL};
 	printk("[Debug+++] dumpthread  on userspace\n");
@@ -674,15 +668,12 @@ void dumpthread_func(struct work_struct *work)
 
 	return;
 }
-
 static int __init lowmem_init(void)
 {
 	register_shrinker(&lowmem_shrinker);
 	vmpressure_notifier_register(&lmk_vmpr_nb);
-
 	INIT_WORK(&__dumpmem_work, dumpmem_func);
 	INIT_WORK(&__dumpthread_work, dumpthread_func);
-
 	return 0;
 }
 device_initcall(lowmem_init);

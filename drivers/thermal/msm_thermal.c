@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -188,9 +188,7 @@ static bool ocr_nodes_called;
 static bool ocr_probed;
 static bool ocr_reg_init_defer;
 static bool hotplug_enabled;
-/* ASUS_BSP (ShowCai) +++ */
 static bool interrupt_mode_enable;
-/* ASUS_BSP (ShowCai) --- */
 static bool msm_thermal_probed;
 static bool gfx_crit_phase_ctrl_enabled;
 static bool gfx_warm_phase_ctrl_enabled;
@@ -519,7 +517,7 @@ static ssize_t thermal_config_debugfs_write(struct file *file,
 
 #define CXIP_LM_CLIENTS_STATUS()                                        \
 	readl_relaxed(cxip_lm_reg_base + CXIP_LM_VOTE_STATUS)
-
+	
 /* ASUS_BSP (ShowCai) +++ reduce thermal log */
 #define NUM_OF_CPU 8
 #define LOG_SAMPLE_RATE 20
@@ -1042,7 +1040,8 @@ static int  msm_thermal_cpufreq_callback(struct notifier_block *nfb,
 	switch (event) {
 	case CPUFREQ_ADJUST:
 		/* ASUS_BSP (ShowCai) +++ nodify LMH and CPU driver in same time */
-		//max_freq_req = (lmh_dcvs_available) ? UINT_MAX :
+		//max_freq_req = (lmh_dcvs_is_supported) ? UINT_MAX :
+		//	cpus[policy->cpu].parent_ptr->limited_max_freq;
 		max_freq_req = cpus[policy->cpu].parent_ptr->limited_max_freq;
 		/* ASUS_BSP (ShowCai) --- nodify LMH and CPU driver in same time */
 		min_freq_req = cpus[policy->cpu].parent_ptr->limited_min_freq;
@@ -1103,6 +1102,16 @@ static int msm_lmh_dcvs_update(int cpu)
 	uint32_t min_freq = cpus[cpu].limited_min_freq;
 	uint32_t affinity;
 	int ret;
+
+	/*
+	 * It is better to use max/min limits of cluster for given
+	 * cpu if cluster mitigation is supported. It ensures that it
+	 * requests aggregated max/min limits of all cpus in that cluster.
+	 */
+	if (core_ptr) {
+		max_freq = cpus[cpu].parent_ptr->limited_max_freq;
+		min_freq = cpus[cpu].parent_ptr->limited_min_freq;
+	}
 
 	switch (id) {
 	case 0:
@@ -3195,13 +3204,13 @@ static int __ref update_offline_cores(int val)
 			} else if (ret) {
 				cpus_offlined |= BIT(cpu);
 				pend_hotplug_req = true;
-				/* ASUS_BSP (ShowCai) +++ reduce thermal log */
+				/* ASUS_BSP (Clay) +++ reduce thermal log */
 				if(limit_cpu_error_log(cpu)){
 					pr_err_ratelimited(
 						"Unable to online CPU%d. err:%d\n",
 						cpu, ret);
 				}
-				/* ASUS_BSP (ShowCai) --- reduce thermal log */
+				/* ASUS_BSP (Clay) --- reduce thermal log */
 			} else {
 				pr_debug("Onlined CPU%d\n", cpu);
 				trace_thermal_post_core_online(cpu,
@@ -4982,13 +4991,10 @@ static void __ref disable_msm_thermal(void)
 
 static void interrupt_mode_init(void)
 {
-	/* ASUS_BSP (ShowCai) +++ */
 	if (!msm_thermal_probed) {
 		interrupt_mode_enable = true;
 		return;
 	}
-	/* ASUS_BSP (ShowCai) --- */
-
 	if (polling_enabled) {
 		polling_enabled = 0;
 		create_sensor_zone_id_map();
@@ -5064,7 +5070,7 @@ static ssize_t __ref store_cc_enabled(struct kobject *kobj,
 		hotplug_init_cpu_offlined();
 		mutex_lock(&core_control_mutex);
 		update_offline_cores(cpus_offlined);
-		if (hotplug_enabled) {
+		if (hotplug_enabled && hotplug_task) {
 			for_each_possible_cpu(cpu) {
 				if (!(msm_thermal_info.core_control_mask &
 					BIT(cpus[cpu].cpu)))
@@ -6159,6 +6165,13 @@ static int probe_vdd_rstr(struct device_node *node,
 	if (ret)
 		goto read_node_fail;
 
+	/*
+	 * Monitor only this sensor if defined, otherwise monitor all tsens
+	 */
+	key = "qcom,vdd-restriction-sensor-id";
+	if (of_property_read_u32(node, key, &data->vdd_rstr_sensor_id))
+		data->vdd_rstr_sensor_id = MONITOR_ALL_TSENS;
+
 	for_each_child_of_node(node, child_node) {
 		rails_cnt++;
 	}
@@ -6231,7 +6244,7 @@ static int probe_vdd_rstr(struct device_node *node,
 			goto read_node_fail;
 		}
 		ret = sensor_mgr_init_threshold(&thresh[MSM_VDD_RESTRICTION],
-			MONITOR_ALL_TSENS,
+			data->vdd_rstr_sensor_id,
 			data->vdd_rstr_temp_hyst_degC, data->vdd_rstr_temp_degC,
 			vdd_restriction_notify);
 		if (ret) {
@@ -7167,6 +7180,10 @@ static void thermal_vdd_config_read(struct seq_file *m, void *data)
 				msm_thermal_info.vdd_rstr_temp_degC);
 		seq_printf(m, "threshold clear:%d degC\n",
 				msm_thermal_info.vdd_rstr_temp_hyst_degC);
+		if (msm_thermal_info.vdd_rstr_sensor_id != MONITOR_ALL_TSENS)
+			seq_printf(m, "tsens sensor:tsens_tz_sensor%d\n",
+				msm_thermal_info.vdd_rstr_sensor_id);
+
 		for (i = 0; i < rails_cnt; i++) {
 			if (!strcmp(rails[i].name, "vdd-dig")
 				&& rails[i].num_levels)
@@ -7501,13 +7518,10 @@ static int msm_thermal_dev_probe(struct platform_device *pdev)
 	if (ret)
 		goto probe_exit;
 	msm_thermal_probed = true;
-	
-	/* ASUS_BSP (ShowCai) +++ */
 	if (interrupt_mode_enable) {
 		interrupt_mode_init();
 		interrupt_mode_enable = false;
 	}
-	/* ASUS_BSP (ShowCai) --- */
 
 probe_exit:
 	return ret;

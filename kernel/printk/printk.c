@@ -260,7 +260,6 @@ __packed __aligned(4)
  * console_unlock() or anything else that might wake up a process.
  */
 static DEFINE_RAW_SPINLOCK(logbuf_lock);
-
 static char *asus_log_buf = NULL;
 static bool is_logging_to_asus_buffer = false;
 void *memset_nc(void *s, int c, size_t count);
@@ -279,7 +278,7 @@ static void *memcpy_nc(void *dest, const void *src, size_t n)
 static int write_to_asus_log_buffer(const char *text, size_t text_len,
 				enum log_flags lflags) {
 	static ulong log_write_index = 0; /* the index to write the log in asus log buffer */
-	ulong *printk_buffer_slot2_addr = (ulong *)PRINTK_BUFFER_SLOT2; /* ASUS_BSP For upload crash log to DroBox issue */
+	ulong *printk_buffer_slot2_addr = (ulong *)PRINTK_BUFFER_SLOT2;
 
 	if (!asus_log_buf) {
 		return -1;
@@ -306,7 +305,6 @@ static int write_to_asus_log_buffer(const char *text, size_t text_len,
 	}
 
 	*(printk_buffer_slot2_addr + 1) = log_write_index; /* ASUS_BSP For upload crash log to DroBox issue ( Remeber log buffer index ) */
-
 	return text_len;
 }
 
@@ -345,10 +343,6 @@ static u32 clear_idx;
 #define LOG_ALIGN __alignof__(struct printk_log)
 //#define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
 #define __LOG_BUF_LEN (1 << 18)
-/*ASUS_BSP Eason
- * CONFIG_LOG_BUF_SHIFT is  default 17  => 128k,    extend to 18   =>  256k
- * sync with  PRINTK_BUFFER_SLOT_SIZE  in include/linux/asusdebug.h
- */
 static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 static char *log_buf = __log_buf;
 static u32 log_buf_len = __LOG_BUF_LEN;
@@ -1165,7 +1159,6 @@ static size_t print_time(u64 ts, char *buf)
 		}
 	return sprintf(buf, "[%5lu.%06lu] ",
 		       (unsigned long)ts, rem_nsec / 1000);
-
 	}
 }
 
@@ -1188,7 +1181,7 @@ static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 		}
 	}
 
-	/*len += print_time(msg->ts_nsec, buf ? buf + len : NULL);*/
+	//len += print_time(msg->ts_nsec, buf ? buf + len : NULL);
 	return len;
 }
 
@@ -1750,7 +1743,7 @@ static size_t cont_print_text(char *text, size_t size)
 	size_t len;
 
 	if (cont.cons == 0 && (console_prev & LOG_NEWLINE)) {
-		/*textlen += print_time(cont.ts_nsec, text);*/
+		//textlen += print_time(cont.ts_nsec, text);
 		size -= textlen;
 	}
 
@@ -3380,9 +3373,8 @@ void show_regs_print_info(const char *log_lvl)
 {
 	dump_stack_print_info(log_lvl);
 
-	printk("%stask: %p ti: %p task.ti: %p\n",
-	       log_lvl, current, current_thread_info(),
-	       task_thread_info(current));
+	printk("%stask: %p task.stack: %p\n",
+	       log_lvl, current, task_stack_page(current));
 }
 
 #endif
@@ -3400,7 +3392,10 @@ void printk_buffer_rebase(void)
 		printk("%s: asus_log_buf is NULL\n", __func__);
 		return;
 	}
-	memset_nc(asus_log_buf, 0, PRINTK_BUFFER_SLOT_SIZE);
+
+	if (!is_logging_to_asus_buffer)
+		memset_nc(asus_log_buf, 0, PRINTK_BUFFER_SLOT_SIZE);
+
 	is_logging_to_asus_buffer = true;
 
 }

@@ -13,7 +13,7 @@
  */
 
 /********************************/
-/* IR Sensor CM36686 Module */
+/* ALSPS Sensor CM36686 Module */
 /******************************/
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -25,7 +25,7 @@
 /* Debug and Log System */
 /************************/
 #define MODULE_NAME			"ASH_HW"
-#define SENSOR_TYPE_NAME		"IRsensor"
+#define SENSOR_TYPE_NAME		"ALSPS"
 
 #undef dbg
 #ifdef ASH_HW_DEBUG
@@ -40,15 +40,15 @@
 /*Global static variable and function*/
 /***********************************/
 static struct i2c_client	*g_i2c_client = NULL;
-static int cm36686_IRsensor_hw_check_ID(void);
+static int cm36686_ALSPS_hw_check_ID(void);
 static int cm36686_proximity_hw_set_config(void);
 static int cm36686_light_hw_set_config(void);
 
-static int cm36686_IRsensor_hw_init(struct i2c_client* client);
-static int cm36686_IRsensor_hw_show_allreg(void);
-static int cm36686_IRsensor_hw_get_interrupt(void);
-static int cm36686_IRsensor_hw_set_register(uint8_t reg, int value);
-static int cm36686_IRsensor_hw_get_register(uint8_t reg);
+static int cm36686_ALSPS_hw_init(struct i2c_client* client);
+static int cm36686_ALSPS_hw_show_allreg(void);
+static int cm36686_ALSPS_hw_get_interrupt(void);
+static int cm36686_ALSPS_hw_set_register(uint8_t reg, int value);
+static int cm36686_ALSPS_hw_get_register(uint8_t reg);
 
 static int cm36686_proximity_hw_turn_onoff(bool bOn);
 static int cm36686_proximity_hw_get_adc(void);
@@ -71,7 +71,7 @@ static int cm36686_light_hw_set_integration(uint8_t integration);
 /**************************/
 /* i2c read/write register */
 /*************************/
-static int cm36686_IRsensor_hw_check_ID(void)
+static int cm36686_ALSPS_hw_check_ID(void)
 {
 	int ret = 0;
 	uint8_t data_buf[2] = {0, 0};	
@@ -123,9 +123,9 @@ static int cm36686_light_hw_set_config(void)
 }
 
 /*****************/
-/*IR Sensor Part*/
+/*ALSPS Sensor Part*/
 /****************/
-static int cm36686_IRsensor_hw_init(struct i2c_client* client)
+static int cm36686_ALSPS_hw_init(struct i2c_client* client)
 {
 	int ret = 0;
 
@@ -134,7 +134,7 @@ static int cm36686_IRsensor_hw_init(struct i2c_client* client)
 	/* Check the Device ID 
 	 * Do Not return when check ID
 	 */
-	ret = cm36686_IRsensor_hw_check_ID();
+	ret = cm36686_ALSPS_hw_check_ID();
 	
 	 /*Set Proximity config */
 	ret =cm36686_proximity_hw_set_config();
@@ -151,7 +151,7 @@ static int cm36686_IRsensor_hw_init(struct i2c_client* client)
 	return 0;
 }
 
-static int cm36686_IRsensor_hw_show_allreg(void)
+static int cm36686_ALSPS_hw_show_allreg(void)
 {
 	int ret = 0;	
 	uint8_t buf[2] = {0};
@@ -169,7 +169,7 @@ static int cm36686_IRsensor_hw_show_allreg(void)
 	return 0;
 }
 
-static int cm36686_IRsensor_hw_set_register(uint8_t reg, int value)
+static int cm36686_ALSPS_hw_set_register(uint8_t reg, int value)
 {	
 	int ret = 0;	
 	uint8_t buf[2] = {0};
@@ -188,7 +188,7 @@ static int cm36686_IRsensor_hw_set_register(uint8_t reg, int value)
 	return 0;
 }
 
-static int cm36686_IRsensor_hw_get_register(uint8_t reg)
+static int cm36686_ALSPS_hw_get_register(uint8_t reg)
 {
 	int ret = 0;	
 	uint8_t buf[2] = {0};
@@ -198,7 +198,7 @@ static int cm36686_IRsensor_hw_get_register(uint8_t reg)
 	log("Get Register Value (0x%X) = 0x%02X%02X\n", reg, buf[1], buf[0]);
 	if(ret < 0) 
 	{
-		err("IR Sensor Get Register Value ERROR. (REG:0x%X)\n", reg);
+		err("ALSPS Sensor Get Register Value ERROR. (REG:0x%X)\n", reg);
 		return ret;
 	}
 
@@ -207,11 +207,11 @@ static int cm36686_IRsensor_hw_get_register(uint8_t reg)
 	return value;
 }
 
-static int cm36686_IRsensor_hw_get_interrupt(void)
+static int cm36686_ALSPS_hw_get_interrupt(void)
 {
 	uint8_t buf[2] = {0};
 	bool check_flag = false;
-	int irsensor_int = 0;
+	int alsps_int = 0;
 	
 	/* Read INT_FLAG will clean the interrupt */
 	i2c_read_reg_u16(g_i2c_client, INT_FLAG, buf);
@@ -221,9 +221,9 @@ static int cm36686_IRsensor_hw_get_interrupt(void)
 	{
 		check_flag =true;
 		if (buf[1]&INT_FLAG_PS_IF_AWAY) {
-			irsensor_int |= IRSENSOR_INT_PS_AWAY;	
+			alsps_int |= ALSPS_INT_PS_AWAY;	
 		}else if (buf[1]&INT_FLAG_PS_IF_CLOSE) {		
-			irsensor_int |= IRSENSOR_INT_PS_CLOSE;
+			alsps_int |= ALSPS_INT_PS_CLOSE;
 		}else {
 			err("Can NOT recognize the Proximity INT_FLAG (0x%02X%02X)\n", buf[1], buf[0]);
 			return -1;
@@ -234,7 +234,7 @@ static int cm36686_IRsensor_hw_get_interrupt(void)
 	if(buf[1]&INT_FLAG_ALS_IF_L || buf[1]&INT_FLAG_ALS_IF_H) 
 	{	
 		check_flag =true;
-		irsensor_int |= IRSENSOR_INT_ALS;
+		alsps_int |= ALSPS_INT_ALS;
 	} 
 
 	/* Interrupt Error */
@@ -243,7 +243,7 @@ static int cm36686_IRsensor_hw_get_interrupt(void)
 		return -1;
 	}
 
-	return irsensor_int;
+	return alsps_int;
 }
 
 /****************/
@@ -684,33 +684,31 @@ static struct psensor_hw psensor_hw_cm36686 = {
 
 static struct lsensor_hw lsensor_hw_cm36686 = {
 	.light_max_threshold = CM36686_LIGHT_MAX_THRESHOLD,
-	.light_200lux_default = CM36686_LIGHT_200LUX_DEFAULT,
-	.light_1000lux_default = CM36686_LIGHT_1000LUX_DEFAULT,
-		
+	.light_calibration_default = CM36656_LIGHT_CALIBRATION_DEFAULT,
 	.light_hw_turn_onoff = cm36686_light_hw_turn_onoff,
 	.light_hw_get_adc = cm36686_light_hw_get_adc,
 	.light_hw_set_hi_threshold = cm36686_light_hw_set_hi_threshold,
 	.light_hw_set_lo_threshold = cm36686_light_hw_set_lo_threshold,
 };
 
-static struct IRsensor_hw IRsensor_hw_cm36686 = {	
+static struct ALSPS_hw ALSPS_hw_cm36686 = {	
 	.vendor = "Capella",
 	.module_number = "cm36686",
 
-	.IRsensor_hw_check_ID = cm36686_IRsensor_hw_check_ID,
-	.IRsensor_hw_init = cm36686_IRsensor_hw_init,
-	.IRsensor_hw_get_interrupt = cm36686_IRsensor_hw_get_interrupt,
-	.IRsensor_hw_show_allreg = cm36686_IRsensor_hw_show_allreg,
-	.IRsensor_hw_set_register = cm36686_IRsensor_hw_set_register,
-	.IRsensor_hw_get_register = cm36686_IRsensor_hw_get_register,
+	.ALSPS_hw_check_ID = cm36686_ALSPS_hw_check_ID,
+	.ALSPS_hw_init = cm36686_ALSPS_hw_init,
+	.ALSPS_hw_get_interrupt = cm36686_ALSPS_hw_get_interrupt,
+	.ALSPS_hw_show_allreg = cm36686_ALSPS_hw_show_allreg,
+	.ALSPS_hw_set_register = cm36686_ALSPS_hw_set_register,
+	.ALSPS_hw_get_register = cm36686_ALSPS_hw_get_register,
 
 	.mpsensor_hw = &psensor_hw_cm36686,
 	.mlsensor_hw = &lsensor_hw_cm36686,
 };
 
-IRsensor_hw* IRsensor_hw_cm36686_getHardware(void)
+ALSPS_hw* ALSPS_hw_cm36686_getHardware(void)
 {
-	IRsensor_hw* IRsensor_hw_client = NULL;
-	IRsensor_hw_client = &IRsensor_hw_cm36686;
-	return IRsensor_hw_client;
+	ALSPS_hw* ALSPS_hw_client = NULL;
+	ALSPS_hw_client = &ALSPS_hw_cm36686;
+	return ALSPS_hw_client;
 }

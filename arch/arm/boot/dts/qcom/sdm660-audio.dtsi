@@ -227,7 +227,7 @@
 	};
 
 	wsa_spkr_en1: wsa_spkr_en1_pinctrl {
-	      status = "disabled";
+              status = "disabled";
 	      compatible = "qcom,msm-cdc-pinctrl";
 	      pinctrl-names = "aud_active", "aud_sleep";
 	      pinctrl-0 = <&spkr_1_sd_n_active>;
@@ -235,7 +235,7 @@
 	};
 
 	wsa_spkr_en2: wsa_spkr_en2_pinctrl {
-	      status = "disabled";
+              status = "disabled";
 	      compatible = "qcom,msm-cdc-pinctrl";
 	      pinctrl-names = "aud_active", "aud_sleep";
 	      pinctrl-0 = <&spkr_2_sd_n_active>;
@@ -281,8 +281,7 @@
 		};
 	};
 };
-// bsp WeiYu: gpio3 for ADC in Ara +++
-/*
+/* WeiYu: this gpio is for charger
 &pm660_gpios {
 	gpio@c200 {
 		status = "ok";
@@ -295,6 +294,3 @@
 	};
 };
 */
-// bsp WeiYu: gpio3 for ADC in Ara ---
-
-

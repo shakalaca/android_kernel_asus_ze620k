@@ -423,8 +423,6 @@ static int gic_suspend(void)
 	return 0;
 }
 
-#define ADSP_IRQ 189
-
 //ASUS_BSP +++ Johnny [Qcom][PS][][ADD]Print first IP address log when IRQ 484
 static int rmnet_irq_flag_rx = 0;
 int rmnet_irq_flag_function_rx(void)
@@ -465,6 +463,7 @@ int modem_resume_irq_flag_function(void)
 EXPORT_SYMBOL(modem_resume_irq_flag_function);
 /*ASUS-BBSP Log Modem Wake Up Info---*/
 
+#define ADSP_IRQ 189
 static void gic_show_resume_irq(struct gic_chip_data *gic)
 {
 	unsigned int i;
@@ -540,7 +539,7 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
                 }
                 //ASUS_BSP --- Johnny [Qcom][PS][][ADD]Print first IP address log when IRQ 484
 	}
-
+	
 	if(adsp_current_trigger) {
 		if(adsp_previous_trigger) {
 			/**********************************************************************
@@ -564,7 +563,7 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	}
 
 	adsp_previous_trigger = adsp_current_trigger;
-	
+
 //ASUS_BSP +++ [PM]Save maxmum count to 8
 	if (gic_irq_cnt >= 8) {
 		gic_irq_cnt = 7;
@@ -876,7 +875,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
 	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
 	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
 
-	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+	pr_devel("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
 	gic_write_sgi1r(val);
 }
 
@@ -891,7 +890,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 	 * Ensure that stores to Normal memory are visible to the
 	 * other CPUs before issuing the IPI.
 	 */
-	smp_wmb();
+	wmb();
 
 	for_each_cpu(cpu, mask) {
 		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;

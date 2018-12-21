@@ -63,7 +63,7 @@ static void scm_disable_sdi(void);
  * So the SDI cannot be re-enabled when it already by-passed.
 */
 
-#ifdef ASUS_SHIP_BUILD
+#ifdef ASUS_USER_BUILD
 int download_mode = 0;
 #else
 int download_mode = 1;
@@ -126,6 +126,7 @@ static int panic_prep_restart(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
 	in_panic = 1;
+	//qpnp_pon_set_restart_reason(PON_RESTART_REASON_FSCK);
 	return NOTIFY_DONE;
 }
 
@@ -231,6 +232,16 @@ static int dload_set(const char *val, struct kernel_param *kp)
 
 	return 0;
 }
+
+// ASUS BSP +++ set download_mode when writing QPSTInfo
+void set_QPSTInfo_dloadmode(int mode)
+{
+	download_mode = mode;
+	set_dload_mode(download_mode);
+}
+EXPORT_SYMBOL(set_QPSTInfo_dloadmode);
+// ASUS BSP --- set download_mode when writing QPSTInfo
+
 #else
 void set_dload_mode(int on)
 {
@@ -379,23 +390,44 @@ static void msm_restart_prepare(const char *cmd)
 				PON_RESTART_REASON_UNLOCK);
 			__raw_writel(0x6f656d08, restart_reason);
 		// --- ASUS_BSP PeterYeh: add for asus user unlock
+		} else if (!strncmp(cmd, "fsck", 4)) {
+				qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_FSCK);
+			__raw_writel(0x6f656d60, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
+			unsigned long reset_reason;
 			int ret;
 			ret = kstrtoul(cmd + 4, 16, &code);
-			if (!ret)
+			if (!ret) {
+				/* Bit-2 to bit-7 of SOFT_RB_SPARE for hard
+				 * reset reason:
+				 * Value 0 to 31 for common defined features
+				 * Value 32 to 63 for oem specific features
+				 */
+				reset_reason = code +
+						PON_RESTART_REASON_OEM_MIN;
+				if (reset_reason > PON_RESTART_REASON_OEM_MAX ||
+				   reset_reason < PON_RESTART_REASON_OEM_MIN) {
+					pr_err("Invalid oem reset reason: %lx\n",
+						reset_reason);
+				} else {
+					qpnp_pon_set_restart_reason(
+						reset_reason);
+				}
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
-	//Asus_BSP +++ CVE-2017-13174
-	#if defined(ASUS_USER_BUILD)
-		//remove "reboot edl" interface for security
-	#else
-	//Asus_BSP --- CVE-2017-13174
+			}
+		//Asus_BSP +++ CVE-2017-13174
+		#if defined(ASUS_USER_BUILD)
+			//remove "reboot edl" interface for security
+		#else
+		//Asus_BSP --- CVE-2017-13174
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
-	//Asus_BSP +++ CVE-2017-13174
-	#endif
-	//Asus_BSP --- CVE-2017-13174
+		//Asus_BSP +++ CVE-2017-13174
+		#endif
+		//Asus_BSP --- CVE-2017-13174
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}

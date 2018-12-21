@@ -757,20 +757,20 @@ extern int i2c_read_reg_u16(struct i2c_client* client, u8 reg, uint8_t* data);
 extern int i2c_write_reg_u16(struct i2c_client* client, u8 reg, uint8_t* data);
 
 /**
- * ALSPSsensor_I2C - We define functions for i2c driver.
- * @ALSPSsensor_probe : It will be run when "i2c_add_driver" has been called.
- * @ALSPSsensor_remove : Remove all Memory.
- * @ALSPSsensor_shutdown : Turn off all sensors.
- * @ALSPSsensor_suspend : Do what suspend should do.
- * @ALSPSsensor_resume : Do what resume should do.
+ * ALSPS_I2C - We define functions for i2c driver.
+ * @ALSPS_probe : It will be run when "i2c_add_driver" has been called.
+ * @ALSPS_remove : Remove all Memory.
+ * @ALSPS_shutdown : Turn off all sensors.
+ * @ALSPS_suspend : Do what suspend should do.
+ * @ALSPS_resume : Do what resume should do.
  */
-typedef struct ALSPSsensor_I2C {
-	void (*ALSPSsensor_probe)(struct i2c_client *client);
-	void (*ALSPSsensor_remove)(void);
-	void (*ALSPSsensor_shutdown)(void);
-	void (*ALSPSsensor_suspend)(void);
-	void (*ALSPSsensor_resume)(void);	
-}ALSPSsensor_I2C;
+typedef struct ALSPS_I2C {
+	void (*ALSPS_probe)(struct i2c_client *client);
+	void (*ALSPS_remove)(void);
+	void (*ALSPS_shutdown)(void);
+	void (*ALSPS_suspend)(void);
+	void (*ALSPS_resume)(void);	
+}ALSPS_I2C;
 
 /**
  * psensor_I2C - We define functions for i2c driver.
@@ -821,14 +821,14 @@ typedef struct ALSPS_FRGB_I2C {
 }ALSPS_FRGB_I2C;
 
 /**
- * ALSPSsensor_i2c_register - struct ALSPSsensor_I2C wrapped by i2c driver.
+ * ALSPS_i2c_register - struct ALSPSsensor_I2C wrapped by i2c driver.
  */
-extern int ALSPSsensor_i2c_register(ALSPSsensor_I2C *ir_i2c);
+extern int ALSPS_i2c_register(ALSPS_I2C *ir_i2c);
 
 /**
- * ALSPSsensor_i2c_unregister - i2c_del_driver.
+ * ALSPS_i2c_unregister - i2c_del_driver.
  */
-extern int ALSPSsensor_i2c_unregister(void);
+extern int ALSPS_i2c_unregister(void);
 
 /**
  * psensor_i2c_register - struct psensor_I2C wrapped by i2c driver.
@@ -1140,20 +1140,20 @@ typedef struct FRGB_hw {
  * ALSPSsensor_hw - the i2c control functions for ALSPS sensor including psensor and lsensor.
  */
  #include <linux/i2c.h>
-typedef struct ALSPSsensor_hw {	
+typedef struct ALSPS_hw {	
 	char vendor[NAME_SIZE];
 	char module_number[NAME_SIZE];
 
-	int (*ALSPSsensor_hw_check_ID)(void);	
-	int (*ALSPSsensor_hw_init)(struct i2c_client* client);
-	int (*ALSPSsensor_hw_get_interrupt)(void);	
-	int (*ALSPSsensor_hw_show_allreg)(void);	
-	int (*ALSPSsensor_hw_set_register)(uint8_t reg, int value);
-	int (*ALSPSsensor_hw_get_register)(uint8_t reg);	
+	int (*ALSPS_hw_check_ID)(void);	
+	int (*ALSPS_hw_init)(struct i2c_client* client);
+	int (*ALSPS_hw_get_interrupt)(void);	
+	int (*ALSPS_hw_show_allreg)(void);	
+	int (*ALSPS_hw_set_register)(uint8_t reg, int value);
+	int (*ALSPS_hw_get_register)(uint8_t reg);	
 
 	psensor_hw	*mpsensor_hw;
 	lsensor_hw	*mlsensor_hw;
-}ALSPSsensor_hw;
+}ALSPS_hw;
 
  /**
  * ALSPS_FRGB_hw - the i2c control functions for ALSPS FRGB sensor including psensor and lsensor.
@@ -1176,9 +1176,9 @@ typedef struct ALSPS_FRGB_hw {
 }ALSPS_FRGB_hw;
 
 /**
- * ALSPSsensor_hw_getHardware - Before this function, you SHOULD execute ALSPSsensor_i2c_register first.
+ * ALSPS_hw_getHardware - Before this function, you SHOULD execute ALSPSsensor_i2c_register first.
  */
-extern ALSPS_FRGB_hw* ALSPSsensor_hw_getHardware(void);
+extern ALSPS_hw* ALSPS_hw_getHardware(void);
 
 /**
  * psensor_hw_getHardware - Before this function, you SHOULD execute psensor_i2c_register first.

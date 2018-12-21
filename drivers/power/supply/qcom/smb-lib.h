@@ -20,6 +20,11 @@
 #include <linux/extcon.h>
 #include "storm-watch.h"
 
+#ifdef ASUS_ZC600KL_PROJECT
+#include <linux/switch.h>
+#include <linux/wakelock.h>
+#endif
+
 enum print_reason {
 	PR_INTERRUPT	= BIT(0),
 	PR_REGISTER	= BIT(1),
@@ -65,6 +70,9 @@ enum print_reason {
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
 #define USBIN_I_VOTER			"USBIN_I_VOTER"
 #define WEAK_CHARGER_VOTER		"WEAK_CHARGER_VOTER"
+#define WBC_VOTER			"WBC_VOTER"
+#define OV_VOTER			"OV_VOTER"
+#define FCC_STEPPER_VOTER		"FCC_STEPPER_VOTER"
 
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
@@ -82,6 +90,12 @@ enum print_reason {
 #define COUNTRY_BR	1
 #define COUNTRY_IN	1
 #define COUNTRY_OTHER	2
+
+#define PD_POWER_DETECTION_DONE	5
+#define PD_POWER_LEVEL_HIGH	2		//for pd icon "++"
+#define PD_POWER_LEVEL_MEDIUM	1	//for pd icon "+"
+#define PD_POWER_LEVEL_DEFAULT	0	//for pd default charging icon
+#define PD_POWER_NOT_PD	-1			//reset state of pd_level, or pd_level not being judged yet
 //bsp WeiYu: add asus defines ---
 
 enum smb_mode {
@@ -96,6 +110,8 @@ enum {
 	TYPEC_CC2_REMOVAL_WA_BIT	= BIT(2),
 	QC_AUTH_INTERRUPT_WA_BIT	= BIT(3),
 	OTG_WA				= BIT(4),
+	OV_IRQ_WA_BIT			= BIT(5),
+	TYPEC_PBS_WA_BIT		= BIT(6),
 };
 
 enum smb_irq_index {
@@ -138,6 +154,12 @@ enum smb_irq_index {
 	TEMPERATURE_CHANGE_IRQ,
 	SWITCH_POWER_OK_IRQ,
 	SMB_IRQ_MAX,
+};
+
+enum try_sink_exit_mode {
+	ATTACHED_SRC = 0,
+	ATTACHED_SINK,
+	UNATTACHED_SINK,
 };
 
 struct smb_irq_info {
@@ -208,7 +230,6 @@ struct smb_params {
 	struct smb_chg_param	dc_icl_div2_mid_hv;
 	struct smb_chg_param	dc_icl_div2_hv;
 	struct smb_chg_param	jeita_cc_comp;
-	struct smb_chg_param	step_cc_delta[5];
 	struct smb_chg_param	freq_buck;
 	struct smb_chg_param	freq_boost;
 };
@@ -245,6 +266,7 @@ struct smb_charger {
 	struct smb_params	param;
 	struct smb_iio		iio;
 	int			*debug_mask;
+	int			*try_sink_enabled;
 	enum smb_mode		mode;
 	struct smb_chg_freq	chg_freq;
 	int			smb_version;
@@ -311,7 +333,12 @@ struct smb_charger {
 	struct delayed_work	pl_enable_work;
 	struct work_struct	legacy_detection_work;
 	struct delayed_work	uusb_otg_work;
-	struct delayed_work	bb_removal_work;	// WY add 
+	struct delayed_work	bb_removal_work;
+//+Bug317384,zhaosidong.wt,ADD,20171108,add battery level control for ATO version	
+#ifdef WT_COMPILE_FACTORY_VERSION
+	struct delayed_work abnormal_detect; 
+#endif
+//-Bug317384,zhaosidong.wt,ADD,20171108,add battery level control for ATO version
 
 	/* asus work */
 	struct delayed_work	asus_chg_flow_work;
@@ -361,11 +388,13 @@ struct smb_charger {
 	u8			float_cfg;
 	bool			use_extcon;
 	bool			otg_present;
+	bool			fcc_stepper_mode;
 
 	/* workaround flag */
 	u32			wa_flags;
 	bool			cc2_detach_wa_active;
 	bool			typec_en_dis_active;
+	bool			try_sink_active;
 	int			boost_current_ua;
 	int			temp_speed_reading_count;
 
@@ -379,6 +408,49 @@ struct smb_charger {
 	/* qnovo */
 	int			usb_icl_delta_ua;
 	int			pulse_cnt;
+
+	/* oem configure */
+
+#ifdef ASUS_ZC600KL_PROJECT	
+//+Bug 305574, baidabin.wt ADD,2017-10-08,skip thermal chg current set when display is off
+	struct delayed_work rerun_thermal_workqueue;
+	struct wake_lock	rerun_thermal_wake_lock;
+//+Bug317384,zhaosidong.wt,ADD,20171108,add battery level control for ATO version
+#ifdef WT_COMPILE_FACTORY_VERSION
+	struct wake_lock    ato_chrg_wake_lock;
+#endif
+//-Bug317384,zhaosidong.wt,ADD,20171108,add battery level control for ATO version
+//+Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add the chrg detect wake_lock
+    struct wake_lock    asus_chrg_detect_wake_lock;
+//-Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add the chrg detect wake_lock
+	struct notifier_block chg_lcmoff_fb_notifier;
+//-Bug 305574, baidabin.wt ADD,2017-10-08,skip thermal chg current set when display is off
+//+Bug305851, zk-zhouying.wt, ADD, 2017-10-10, add usb temp alarm
+	bool   pre_usbchg_temp_enable;
+	bool   pre_otgchg_temp_enable;
+	bool   usbchg_temp_alert;
+	bool   pre_usbchg_temp_alert;
+	struct switch_dev sdev;
+	struct delayed_work usb_temp_det_work;
+	struct pinctrl *usb_temp_pinctrl;
+	bool  thermal_offline;   //Bug336640,zhaosidong.wt,MODIFY,20180124,add for usb thermal alert
+	bool  poweroff_charger_mode;   //Bug336640,zhaosidong.wt,MODIFY,20180124,add for usb thermal alert
+//-Bug305851, zk-zhouying.wt, ADD, 2017-10-10, add usb temp alarm
+//+Bug305852, zk-zhouying.wt, ADD, 2017-10-27, add asus adapter check
+	struct qpnp_vadc_chip  *amux4_vadc_dev;
+	struct delayed_work adap_adc_work;
+//-Bug305852, zk-zhouying.wt, ADD, 2017-10-27, add asus adapter check
+//+Bug321118 baidabin.wt,MODIFY,20171129,modify country code detect issue
+    struct delayed_work country_code_detect_work;
+//-Bug321118 baidabin.wt,MODIFY,20171129,modify country code detect issue
+//+Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add for voltage and temp protect
+    struct delayed_work asus_temp_voltage_protect_work;
+//-Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add for voltage and temp protect
+//+Bug 330703,baidabin.wt,MODIFY,2017-12-20, Add for float charger rerun
+    struct delayed_work asus_float_charger_rerun_work;
+//-Bug 330703,baidabin.wt,MODIFY,2017-12-20, Add for float charger rerun
+#endif
+
 };
 
 //ASUS BSP : Add gpio control struct +++
@@ -456,14 +528,6 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 int smblib_get_prop_system_temp_level(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_input_current_limited(struct smb_charger *chg,
-				union power_supply_propval *val);
-int smblib_get_prop_batt_voltage_now(struct smb_charger *chg,
-				union power_supply_propval *val);
-int smblib_get_prop_batt_current_now(struct smb_charger *chg,
-				union power_supply_propval *val);
-int smblib_get_prop_batt_temp(struct smb_charger *chg,
-				union power_supply_propval *val);
-int smblib_get_prop_batt_charge_counter(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
@@ -543,6 +607,9 @@ void smblib_suspend_on_debug_battery(struct smb_charger *chg);
 int smblib_rerun_apsd_if_required(struct smb_charger *chg);
 int smblib_get_prop_fcc_delta(struct smb_charger *chg,
 				union power_supply_propval *val);
+//+Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add the fcc delta interface
+int smblib_set_prop_fcc_delta(struct smb_charger *chg, int jeita_cc_delta_ua);
+//-Bug 329838,baidabin.wt,MODIFY,2017-12-15, Add the fcc delta interface
 int smblib_icl_override(struct smb_charger *chg, bool override);
 int smblib_dp_dm(struct smb_charger *chg, int val);
 int smblib_disable_hw_jeita(struct smb_charger *chg, bool disable);
@@ -552,8 +619,12 @@ int smblib_get_icl_current(struct smb_charger *chg, int *icl_ua);
 int smblib_get_charge_current(struct smb_charger *chg, int *total_current_ua);
 int smblib_get_prop_pr_swap_in_progress(struct smb_charger *chg,
 				union power_supply_propval *val);
+int smblib_get_prop_from_bms(struct smb_charger *chg, 
+				enum power_supply_property psp, 
+				union power_supply_propval *val); 
 int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 				const union power_supply_propval *val);
+void smblib_usb_typec_change(struct smb_charger *chg);
 
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);

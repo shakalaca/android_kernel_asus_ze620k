@@ -126,7 +126,7 @@ int pm_autosleep_set_state(suspend_state_t state)
 
 	if (state > PM_SUSPEND_ON) {
 		pm_wakep_autosleep_enabled(true);
-		
+
 //ASUS_BSP +++ Debug for active wakelock before entering suspend
 		g_resume_status = false; //in sleep mode
 		printk("[PM]unattended_timer: mod_timer (due to auto_sleep)\n");

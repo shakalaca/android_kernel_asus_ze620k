@@ -44,10 +44,14 @@ struct mdss_panel_data *g_mdss_pdata;
 
 bool g_asus_lcd_power_off = false;
 EXPORT_SYMBOL(g_asus_lcd_power_off);
+
 /* asus touch suspend/resume callbacks */
+#ifdef ASUS_ZE620KL_PROJECT
 extern int fts_ts_suspend(void);
 extern bool fts_gesture_check(void);
+#else
 extern bool asus_rmi4_gesture_check(void);
+#endif
 
 
 /* Master structure to hold all the information about the DSI/panel */
@@ -382,7 +386,12 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	bool gesture_en = false;
 
+#ifdef ASUS_ZE620KL_PROJECT
 	gesture_en = fts_gesture_check();
+#else
+
+#endif
+
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		ret = -EINVAL;
@@ -395,7 +404,9 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	pr_err("[Display] %s: +++\n", __func__);
 
 	if (system_doing_shutdown) {
+#ifdef ASUS_ZE620KL_PROJECT
 		mdelay(10);
+#endif
 		pr_err("[Display] Doing shutdown, doing reset\n");
 		ret = mdss_dsi_panel_reset(pdata, 0);
 		if (ret) {
@@ -416,6 +427,7 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_debug("reset disable: pinctrl not enabled\n");
 
 	if (!gesture_en) {
+		pr_err("[Display] disable power rail.\n");
 		ret = msm_dss_enable_vreg(
 			ctrl_pdata->panel_power_data.vreg_config,
 			ctrl_pdata->panel_power_data.num_vreg, 0);
@@ -435,8 +447,14 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	bool gesture_en = false;
-	if (!first_panel_power_on)
+
+	if (!first_panel_power_on) {
+#ifdef ASUS_ZE620KL_PROJECT
 		gesture_en = fts_gesture_check();
+#else
+
+#endif
+	}
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -449,15 +467,15 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	pr_err("[Display] %s: +++\n", __func__);
 
 	if (first_panel_power_on || !gesture_en) {
-	ret = msm_dss_enable_vreg(
-		ctrl_pdata->panel_power_data.vreg_config,
-		ctrl_pdata->panel_power_data.num_vreg, 1);
-	if (ret) {
-		pr_err("%s: failed to enable vregs for %s\n",
-			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
-		return ret;
-	}
-
+		pr_err("[Display] enable power rail.\n");
+		ret = msm_dss_enable_vreg(
+			ctrl_pdata->panel_power_data.vreg_config,
+			ctrl_pdata->panel_power_data.num_vreg, 1);
+		if (ret) {
+			pr_err("%s: failed to enable vregs for %s\n",
+				__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+			return ret;
+		}
 	}
 
 	/*
@@ -466,10 +484,11 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	 * bootloader. This needs to be done irresepective of whether
 	 * the lp11_init flag is set or not.
 	 */
-	if ((pdata->panel_info.cont_splash_enabled ||
-		!pdata->panel_info.mipi.lp11_init)) {
+	if (pdata->panel_info.cont_splash_enabled ||
+		!pdata->panel_info.mipi.lp11_init) {
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
 			pr_debug("reset enable: pinctrl not enabled\n");
+
 		ret = mdss_dsi_panel_reset(pdata, 1);
 		if (ret)
 			pr_err("%s: Panel reset failed. rc=%d\n",
@@ -1390,9 +1409,15 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata, int power_state)
 	mdss_dsi_clamp_phy_reset_config(ctrl_pdata, false);
 	mdss_dsi_clk_ctrl(ctrl_pdata, ctrl_pdata->dsi_clk_handle,
 			  MDSS_DSI_CORE_CLK, MDSS_DSI_CLK_OFF);
-	msleep(10);
+
 	g_asus_lcd_power_off = true;
+#ifdef ASUS_ZE620KL_PROJECT
+	msleep(10);
 	fts_ts_suspend();
+#else
+
+#endif
+
 panel_power_ctrl:
 	ret = mdss_dsi_panel_power_ctrl(pdata, power_state);
 	if (ret) {
@@ -3037,10 +3062,24 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 		pr_info("%s: cmdline:%s panel_name:%s\n",
 			__func__, panel_cfg, panel_name);
 
-		if (strcmp("qcom,mdss_dsi_tm5p5_r63350_1080p_video", panel_name) == 0 ) {
+#ifdef ASUS_ZE620KL_PROJECT
+		if (strcmp("qcom,mdss_dsi_tm5p5_r63350_1080p_video", panel_name) == 0) {
 			g_asus_lcdID = ARA_LCD_AUO;
 			printk("[Display] LCD ID = ARA AUO\n");
 		}
+#endif
+#ifdef ASUS_ZC600KL_PROJECT
+		if (strcmp("qcom,mdss_dsi_td4310_1080p_video", panel_name) == 0) {
+			g_asus_lcdID = ZC600KL_LCD_TD4310;
+			printk("[Display] LCD ID = 5Q main source TD4310\n");
+		} else if (strcmp("qcom,mdss_dsi_nt36672_1080p_video", panel_name) == 0) {
+			g_asus_lcdID = ZC600KL_LCD_NT36672;
+			printk("[Display] LCD ID = 5Q second source NT36672\n");
+		} else {
+			g_asus_lcdID = ZC600KL_LCD_UNKNOWN;
+			printk("[Display] LCD ID error, unknown panel name: %s\n", panel_name);
+		}
+#endif
 		printk("[Display] g_asus_lcdID = %d\n" , g_asus_lcdID);
 
 		if (!strcmp(panel_name, NONE_PANEL))

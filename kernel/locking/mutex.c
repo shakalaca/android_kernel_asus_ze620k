@@ -48,7 +48,6 @@
 #endif
 
 extern struct mutex fake_mutex;
-
 void
 __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 {
@@ -59,7 +58,6 @@ __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
 	osq_lock_init(&lock->osq);
 #endif
-	//added by jack
 	lock->name = name;
 
 	debug_mutex_init(lock, name, key);
@@ -443,7 +441,7 @@ void __sched mutex_unlock(struct mutex *lock)
 	 * into 'unlocked' state:
 	 */
 
-	mutex_clear_owner(lock); //added by jack for debugging mutex deadlock
+	mutex_clear_owner(lock);
 
 	__mutex_fastpath_unlock(&lock->count, __mutex_unlock_slowpath);
 }
@@ -548,7 +546,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		goto skip_wait;
 
 	debug_mutex_lock_common(lock, &waiter);
-	debug_mutex_add_waiter(lock, &waiter, task_thread_info(task));
+	debug_mutex_add_waiter(lock, &waiter, task);
 
 	/* add waiting tasks to the end of the waitqueue (FIFO): */
 	list_add_tail(&waiter.list, &lock->wait_list);
@@ -597,7 +595,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	}
 	__set_task_state(task, TASK_RUNNING);
 
-	mutex_remove_waiter(lock, &waiter, current_thread_info());
+	mutex_remove_waiter(lock, &waiter, task);
 	/* set it to 0 if there are no waiters left: */
 	if (likely(list_empty(&lock->wait_list)))
 		atomic_set(&lock->count, 0);
@@ -618,7 +616,7 @@ skip_wait:
 	return 0;
 
 err:
-	mutex_remove_waiter(lock, &waiter, task_thread_info(task));
+	mutex_remove_waiter(lock, &waiter, task);
 	spin_unlock_mutex(&lock->wait_lock, flags);
 	debug_mutex_free_waiter(&waiter);
 	mutex_release(&lock->dep_map, 1, ip);
@@ -732,6 +730,7 @@ static inline void
 __mutex_unlock_common_slowpath(struct mutex *lock, int nested)
 {
 	unsigned long flags;
+	WAKE_Q(wake_q);
 
 	/*
 	 * As a performance measurement, release the lock before doing other
@@ -759,11 +758,11 @@ __mutex_unlock_common_slowpath(struct mutex *lock, int nested)
 					   struct mutex_waiter, list);
 
 		debug_mutex_wake_waiter(lock, waiter);
-
-		wake_up_process(waiter->task);
+		wake_q_add(&wake_q, waiter->task);
 	}
 
 	spin_unlock_mutex(&lock->wait_lock, flags);
+	wake_up_q(&wake_q);
 }
 
 /*

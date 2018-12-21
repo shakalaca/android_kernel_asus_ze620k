@@ -384,7 +384,7 @@ static int cm36656_proximity_hw_turn_onoff(bool bOn)
 			return ret;
 	}
 
-	if(g_ASUS_hwID >= ZE620KL_PR && PS_START == 0){
+	if(/*g_ASUS_hwID >= ZE620KL_PR &&*/ PS_START == 0){
 		ret = cm36656_proximity_hw_set_ps_start(CM36656_PS_START);
 		if (ret < 0)		
 			return ret;

@@ -16,13 +16,29 @@
 #include <uapi/linux/kernel.h>
 #include <linux/asusdebug.h>
 
-//ASUS_BSP: +++
+//ASUS_BSP: display +++
+#ifdef ASUS_ZE620KL_PROJECT
 enum {
 	ARA_LCD_AUO = 0,
 	ARA_LCD_AUO_2
 };
+#endif
+#ifdef ASUS_ZC600KL_PROJECT
+enum {
+	ZC600KL_LCD_TD4310 = 1,
+	ZC600KL_LCD_NT36672,
+	ZC600KL_LCD_UNKNOWN
+};
+#endif
+
 extern int g_asus_lcdID;
-//ASUS_BSP: ---
+//ASUS_BSP: display ---
+
+//ASUS_BSP Ryder: define status flag of touch porting +++
+#ifdef ASUS_ZE620KL_PROJECT
+#define ASUS_DISABLE_TOUCH_PORTING_COMPLETED 1
+#endif
+//ASUS_BSP Ryder: define status flag of touch porting ---
 
 // +++ ASUS_BSP : add for miniporting
 enum DEVICE_HWID
@@ -42,17 +58,23 @@ extern enum DEVICE_HWID g_ASUS_hwID;
 enum DEVICE_PRJID
 {
 	//ZE620KL PRJ
-	ZE620KL_660_PRJ_ID = 0x4,
 	ZE620KL_636_PRJ_ID = 0x6,
+
+	//ZE620KL PRJ
+	ZC600KL_630_PRJ_ID = 0xA,
 
 	UNKNOWN_PRJ = 0xFF
 };
 extern enum DEVICE_HWID g_ASUS_prjID;
 // --- ASUS_BSP : add for miniporting
 
-// ASUS_BSP +++ Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP +++ get permissive status
 extern int permissive_enable;
-// ASUS_BSP --- Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP --- get permissive status
+
+/* ASUS_BSP Audio +++ */
+#define ASUS_AUDIO_MODE_PORTING_COMPLETED 1
+/* ASUS_BSP Audio --- */
 
 #define USHRT_MAX	((u16)(~0U))
 #define SHRT_MAX	((s16)(USHRT_MAX>>1))
@@ -91,6 +113,13 @@ extern int permissive_enable;
 #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+
+#define u64_to_user_ptr(x) (		\
+{					\
+	typecheck(u64, x);		\
+	(void __user *)(uintptr_t)x;	\
+}					\
+)
 
 /*
  * This looks more complex than it should be. But we need to
@@ -637,8 +666,6 @@ do {									\
  * let gcc optimize the rest.
  */
 
-#define trace_printk(fmt, ...)
-#if 0
 #define trace_printk(fmt, ...)				\
 do {							\
 	char _______STR[] = __stringify((__VA_ARGS__));	\
@@ -647,7 +674,6 @@ do {							\
 	else						\
 		trace_puts(fmt);			\
 } while (0)
-#endif
 
 #define do_trace_printk(fmt, args...)					\
 do {									\

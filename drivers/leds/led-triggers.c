@@ -88,21 +88,23 @@ ssize_t led_trigger_show(struct device *dev, struct device_attribute *attr,
 	down_read(&led_cdev->trigger_lock);
 
 	if (!led_cdev->trigger)
-		len += sprintf(buf+len, "[none] ");
+		len += scnprintf(buf+len, PAGE_SIZE - len, "[none] ");
 	else
-		len += sprintf(buf+len, "none ");
+		len += scnprintf(buf+len, PAGE_SIZE - len, "none ");
 
 	list_for_each_entry(trig, &trigger_list, next_trig) {
 		if (led_cdev->trigger && !strcmp(led_cdev->trigger->name,
 							trig->name))
-			len += sprintf(buf+len, "[%s] ", trig->name);
+			len += scnprintf(buf+len, PAGE_SIZE - len, "[%s] ",
+					 trig->name);
 		else
-			len += sprintf(buf+len, "%s ", trig->name);
+			len += scnprintf(buf+len, PAGE_SIZE - len, "%s ",
+					 trig->name);
 	}
 	up_read(&led_cdev->trigger_lock);
 	up_read(&triggers_list_lock);
 
-	len += sprintf(len+buf, "\n");
+	len += scnprintf(len+buf, PAGE_SIZE - len, "\n");
 	return len;
 }
 EXPORT_SYMBOL_GPL(led_trigger_show);
@@ -305,6 +307,25 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
 }
 EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
 
+//+bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+struct led_trigger * led_trigger_get(const char *name)
+{
+       struct led_trigger *_trig;
+
+       down_write(&triggers_list_lock);
+       /* Make sure the trigger's name isn't already in use */
+       list_for_each_entry(_trig, &trigger_list, next_trig) {
+               if (!strcmp(_trig->name, name)) {
+                       up_write(&triggers_list_lock);
+                       return _trig;
+               }
+       }
+       up_write(&triggers_list_lock);
+       return NULL;
+}
+//-bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+
+
 void led_trigger_register_simple(const char *name, struct led_trigger **tp)
 {
 	struct led_trigger *trig;
@@ -325,6 +346,13 @@ void led_trigger_register_simple(const char *name, struct led_trigger **tp)
 		pr_warn("LED trigger %s failed to register (no memory)\n",
 			name);
 	}
+#ifdef ASUS_ZC600KL_PROJECT
+       //+bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+       if(!strcmp("switch0_trigger", name) && trig == NULL){
+               trig = led_trigger_get(name);
+       }
+       //-bug 305924, sunhushan.wt, ADD, 2017.11.25, add for flash light
+#endif	
 	*tp = trig;
 }
 EXPORT_SYMBOL_GPL(led_trigger_register_simple);

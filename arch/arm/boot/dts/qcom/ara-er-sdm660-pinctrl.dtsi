@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -240,6 +240,18 @@
 					bias-pull-up;
 				};
 			};
+			i2c_1_bitbang: i2c_1_bitbang {
+				mux {
+					pins = "gpio2", "gpio3";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio2", "gpio3";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
 		};
 
 		i2c_2 {
@@ -260,6 +272,18 @@
 				mux {
 					pins = "gpio6", "gpio7";
 					function = "blsp_i2c2";
+				};
+
+				config {
+					pins = "gpio6", "gpio7";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+			i2c_2_bitbang: i2c_2_bitbang {
+				mux {
+					pins = "gpio6", "gpio7";
+					function = "gpio";
 				};
 
 				config {
@@ -296,6 +320,18 @@
 					bias-pull-up;
 				};
 			};
+			i2c_3_bitbang: i2c_3_bitbang {
+				mux {
+					pins = "gpio10", "gpio11";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio10", "gpio11";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
 		};
 
 		i2c_4 {
@@ -316,6 +352,18 @@
 				mux {
 					pins = "gpio14", "gpio15";
 					function = "blsp_i2c4";
+				};
+
+				config {
+					pins = "gpio14", "gpio15";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+			i2c_4_bitbang: i2c_4_bitbang {
+				mux {
+					pins = "gpio14", "gpio15";
+					function = "gpio";
 				};
 
 				config {
@@ -352,6 +400,18 @@
 					bias-pull-up;
 				};
 			};
+			i2c_5_bitbang: i2c_5_bitbang {
+				mux {
+					pins = "gpio18", "gpio19";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio18", "gpio19";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
 		};
 
 		i2c_6 {
@@ -372,6 +432,18 @@
 				mux {
 					pins = "gpio22", "gpio23";
 					function = "blsp_i2c6";
+				};
+
+				config {
+					pins = "gpio22", "gpio23";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+			i2c_6_bitbang: i2c_6_bitbang {
+				mux {
+					pins = "gpio22", "gpio23";
+					function = "gpio";
 				};
 
 				config {
@@ -472,6 +544,18 @@
 					bias-pull-up;
 				};
 			};
+			i2c_7_bitbang: i2c_7_bitbang {
+				mux {
+					pins = "gpio26", "gpio27";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio26", "gpio27";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
 		};
 
 		i2c_8 {
@@ -500,8 +584,20 @@
 					bias-pull-up;
 				};
 			};
-		};
+			i2c_8_bitbang: i2c_8_bitbang {
+				mux {
+					pins = "gpio30", "gpio31";
+					function = "gpio";
+				};
 
+				config {
+					pins = "gpio30", "gpio31";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+		};
+		
 		/* add pingrp for fingerprint */
 		tlmm_fp_int {
 			fp_int_active: fp_int_active {
@@ -818,9 +914,7 @@
 				};
 			};
 		};
-/***************************************************************************/
-/* ASUS_BSP +++ Diable USB C analog on ASUS ARA project */
-/*
+
 		wcd_usbc_analog_en2n {
 			wcd_usbc_analog_en2n_idle: wcd_usbc_ana_en2n_idle {
 				mux {
@@ -850,8 +944,7 @@
 				};
 			};
 		};
-*/
-/* ASUS_BSP --- */
+
 		sdw_clk_pin {
 			sdw_clk_sleep: sdw_clk_sleep {
 				mux {
@@ -1134,6 +1227,34 @@
 			};
 		};
 
+		cam_tof_active: cam_tof_active {
+			/* LASER */
+			mux {
+				pins = "gpio50", "gpio42", "gpio45";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio50", "gpio42", "gpio45";
+				bias-pull-up;
+				drive-strength = <2>; /* 2 MA */
+			};
+		};
+
+		cam_tof_suspend: cam_tof_suspend {
+			/* LASER */
+			mux {
+				pins = "gpio50", "gpio42", "gpio45";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio50", "gpio42", "gpio45";
+				bias-pull-down; /* PULL DOWN */
+				drive-strength = <2>; /* 2 MA */
+			};
+		};
+
 		cam_sensor_mclk0_active: cam_sensor_mclk0_active {
 			/* MCLK0 */
 			mux {
@@ -1167,12 +1288,12 @@
 		cam_sensor_rear_active: cam_sensor_rear_active {
 			/* RESET, STANDBY */
 			mux {
-				pins = "gpio46","gpio44";
+				pins = "gpio46";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio46","gpio44";
+				pins = "gpio46";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -1181,12 +1302,12 @@
 		cam_sensor_rear_suspend: cam_sensor_rear_suspend {
 			/* RESET, STANDBY */
 			mux {
-				pins = "gpio46","gpio44";
+				pins = "gpio46";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio46","gpio44";
+				pins = "gpio46";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -1225,12 +1346,12 @@
 		cam_sensor_rear2_active: cam_sensor_rear2_active {
 			/* RESET, STANDBY */
 			mux {
-				pins = "gpio48";
+				pins = "gpio48","gpio51";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio48";
+				pins = "gpio48","gpio51";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -1253,12 +1374,12 @@
 			/* MCLK1 */
 			mux {
 				/* CLK */
-				pins = "gpio35";
+				pins = "gpio34";
 				function = "cam_mclk";
 			};
 
 			config {
-				pins = "gpio35";
+				pins = "gpio34";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -1268,12 +1389,12 @@
 			/* MCLK1 */
 			mux {
 				/* CLK */
-				pins = "gpio35";
+				pins = "gpio34";
 				function = "cam_mclk";
 			};
 
 			config {
-				pins = "gpio35";
+				pins = "gpio34";
 				bias-pull-down; /* PULL DOWN */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -1523,7 +1644,7 @@
 				bias-disable;
 			};
 		};
-
+		
 		/* ASUS_BSP +++ ShawnHuang cm36656 */
 		cm36656_int_pin {
 			cm36656_default: cm36656_default {
@@ -1584,91 +1705,6 @@
 		};
 		/* ASUS_BSP --- ShawnHuang hall sensor */
 
-		/* ASUS_BSP +++ For SAR sensor */
-		sar_sensor_int_pin {
-			gpio_sar_sensor_active: gpio_sar_sensor_active {
-				mux {
-					pins = "gpio77";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio77";
-					drive-strength = <2>;
-					bias-pull-up;
-				};
-			};
-			
-			gpio_sar_sensor_suspend: gpio_sar_sensor_suspend {
-				mux {
-					pins = "gpio77";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio77";
-					drive-strength = <2>;
-					bias-pull-up;
-				};
-			};
-		};
-		/* ASUS_BSP --- For SAR sensor */
-
-		tlmm_gpio_key {
-			gpio_key_active: gpio_key_active {
-				mux {
-					pins = "gpio43", "gpio44";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio43", "gpio44";
-					drive-strength = <2>;
-					bias-pull-up;
-				};
-			};
-
-			gpio_key_suspend: gpio_key_suspend {
-				mux {
-					pins = "gpio43", "gpio44";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio43", "gpio44";
-					drive-strength = <2>;
-					bias-pull-up;
-				};
-			};
-		};
-
-		pmx_mdss: pmx_mdss {
-			mdss_dsi_active: mdss_dsi_active {
-				mux {
-					pins = "gpio53";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio53";
-					drive-strength = <8>; /* 8 mA */
-					bias-disable = <0>; /* no pull */
-				};
-			};
-			mdss_dsi_suspend: mdss_dsi_suspend {
-				mux {
-					pins = "gpio53";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio53";
-					drive-strength = <2>; /* 2 mA */
-					bias-pull-down; /* pull down */
-				};
-			};
-		};
-
 
 		/* ASUS BSP add for charger +++ */
 
@@ -1727,10 +1763,89 @@
 				};
 			};
 		};
-
-
-
 		/* ASUS BSP add for charger --- */
+
+
+		tlmm_gpio_key {
+			gpio_key_active: gpio_key_active {
+				mux {
+					pins = "gpio43", "gpio44";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio43", "gpio44";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+
+			gpio_key_suspend: gpio_key_suspend {
+				mux {
+					pins = "gpio43", "gpio44";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio43", "gpio44";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+		};
+
+		pmx_mdss: pmx_mdss {
+			mdss_dsi_active: mdss_dsi_active {
+				mux {
+					pins = "gpio53";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio53";
+					drive-strength = <8>; /* 8 mA */
+					bias-disable = <0>; /* no pull */
+				};
+			};
+			mdss_dsi_suspend: mdss_dsi_suspend {
+				mux {
+					pins = "gpio53";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio53";
+					drive-strength = <2>; /* 2 mA */
+					bias-pull-down; /* pull down */
+				};
+			};
+		};
+
+		pmx_mdss_te {
+			mdss_te_active: mdss_te_active {
+				mux {
+					pins = "gpio59";
+					function = "mdp_vsync";
+				};
+				config {
+					pins = "gpio59";
+					drive-strength = <2>; /* 8 mA */
+					bias-pull-down; /* pull down*/
+				};
+			};
+
+			mdss_te_suspend: mdss_te_suspend {
+				mux {
+					pins = "gpio59";
+					function = "mdp_vsync";
+				};
+				config {
+					pins = "gpio59";
+					drive-strength = <2>; /* 2 mA */
+					bias-pull-down; /* pull down */
+				};
+			};
+		};
 
 		mdss_dp_aux_active: mdss_dp_aux_active {
 			mux {
@@ -1794,7 +1909,7 @@
 				config {
 					pins = "gpio66", "gpio67";
 					drive-strength = <16>;
-					bias-pull-down;
+					bias-pull-up;
 				};
 			};
 

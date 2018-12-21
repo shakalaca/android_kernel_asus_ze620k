@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,9 @@
 #include "sdm660-external.h"
 #include "../codecs/sdm660_cdc/msm-analog-cdc.h"
 #include "../codecs/wsa881x.h"
+
+/* ASUS_BSP : For SPK/RCV always mute due to clock disable failed during ADSP restart issue QTI_CASE_03337599 */
+#include <sound/q6core.h>
 
 #define DRV_NAME "sdm660-asoc-snd"
 
@@ -197,14 +200,24 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec);
 static struct wcd_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
+#ifdef ASUS_ZC600KL_PROJECT
+	.detect_extn_cable = false,
+#else
 	.detect_extn_cable = true,
+#endif
 	.mono_stero_detection = false,
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = true,
 	.key_code[0] = KEY_MEDIA,
+#ifdef ASUS_ZC600KL_PROJECT
+	.key_code[1] = KEY_VOLUMEUP,
+	.key_code[2] = KEY_VOLUMEDOWN,
+	.key_code[3] = KEY_VOICECOMMAND,
+#else
 	.key_code[1] = KEY_VOICECOMMAND,
 	.key_code[2] = KEY_VOLUMEUP,
 	.key_code[3] = KEY_VOLUMEDOWN,
+#endif
 	.key_code[4] = 0,
 	.key_code[5] = 0,
 	.key_code[6] = 0,
@@ -226,14 +239,22 @@ static struct dev_config proxy_rx_cfg = {
 static struct dev_config mi2s_rx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
+#ifdef ASUS_ZE620KL_PROJECT
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S24_LE, 2},
+#else
+	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
+#endif
 	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 };
 
 static struct dev_config mi2s_tx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
+#ifdef ASUS_ZE620KL_PROJECT
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S24_LE, 2},
+#else
+	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
+#endif
 	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
 };
 
@@ -2478,10 +2499,10 @@ int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 	int port_id = msm_get_port_id(rtd->dai_link->be_id);
 	int index = cpu_dai->id;
 	unsigned int fmt = SND_SOC_DAIFMT_CBS_CFS;
-// Jessy +++
+/* ASUS BSP Add for Setting ADSP I2S  TERT_MI2S  pinctrl for stability issue +++ */
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
-// Jessy ---
+/* ASUS_BSP --- */
 	dev_dbg(rtd->card->dev,
 		"%s: substream = %s  stream = %d, dai name %s, dai ID %d\n",
 		__func__, substream->name, substream->stream,
@@ -2532,13 +2553,13 @@ int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 				goto clk_off;
 			}
 		}
-// Jessy +++
+/* ASUS BSP Add for Setting ADSP I2S  TERT_MI2S  pinctrl for stability issue +++ */
 		if (index == TERT_MI2S)
 		{
-			msm_cdc_pinctrl_select_active_state(pdata->tert_mi2s_gpio_p);
-			printk("msm_cdc_pinctrl_select_active_state(pdata->tert_mi2s_gpio_p \n");
+			ret = msm_cdc_pinctrl_select_active_state(pdata->tert_mi2s_gpio_p);
+			pr_err("[Audio][MI2S] %s:msm_cdc_pinctrl_select_active_state return:%d : index(%d)\n", __func__, ret, index);
 		}
-// Jessy ---
+/* ASUS_BSP --- */
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
 	return 0;
@@ -2565,10 +2586,10 @@ void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int port_id = msm_get_port_id(rtd->dai_link->be_id);
 	int index = rtd->cpu_dai->id;
-// Jessy +++
+/* ASUS BSP Add for Setting ADSP I2S  TERT_MI2S  pinctrl for stability issue +++ */
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
-// Jessy ---
+/* ASUS_BSP --- */
 	pr_debug("%s(): substream = %s  stream = %d\n", __func__,
 		 substream->name, substream->stream);
 	if (index < PRIM_MI2S || index > QUAT_MI2S) {
@@ -2578,23 +2599,25 @@ void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 
 	mutex_lock(&mi2s_intf_conf[index].lock);
 	if (--mi2s_intf_conf[index].ref_cnt == 0) {
-// Jessy +++
+/* ASUS BSP Add for Setting ADSP I2S  TERT_MI2S  pinctrl for stability issue +++ */
 		if (index == TERT_MI2S)
 		{
 			msm_cdc_pinctrl_select_sleep_state(pdata->tert_mi2s_gpio_p);
-			printk("msm_cdc_pinctrl_select_sleep_state(pdata->tert_mi2s_gpio_p \n");
+			pr_err("[Audio][MI2S] %s:msm_cdc_pinctrl_select_sleep_state : index(%d)\n", __func__, index);
 		}
-// Jessy ---
+/* ASUS_BSP --- */
 		ret = msm_mi2s_set_sclk(substream, false);
-		if (ret < 0) {
+		if (ret < 0)	{
 			pr_err("%s:clock disable failed for MI2S (%d); ret=%d\n",
 				__func__, index, ret);
-/* Ken +++ workaround for SPK/RCV always mute due to clock disable failed during ADSP restart */
-#if 0
-			mi2s_intf_conf[index].ref_cnt++;
-#endif
-/* Ken --- */
+/* ASUS_BSP : For SPK/RCV always mute due to clock disable failed during ADSP restart issue QTI_CASE_03337599 */
+			/* Qualcomm already fix in "ASoC: sdm660: fix clock refcount for MI2S shutdown" */
+			/*************************/
+			/*if (q6core_is_adsp_ready())
+				mi2s_intf_conf[index].ref_cnt++;
+			*/
 		}
+/* ASUS_BSP --- */
 		if (mi2s_intf_conf[index].msm_is_ext_mclk) {
 			mi2s_mclk[index].enable = 0;
 			pr_debug("%s: Disabling mclk, clk_freq_in_hz = %u\n",
@@ -3124,10 +3147,10 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 					"qcom,cdc-dmic-gpios", 0);
 		pdata->ext_spk_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					"qcom,cdc-ext-spk-gpios", 0);
-// Jessy +++
+/* ASUS BSP Add for Setting ADSP I2S  TERT_MI2S  pinctrl for stability issue +++ */
 		pdata->tert_mi2s_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					"qcom,tert-mi2s-gpios", 0);
-// Jessy ---
+/* ASUS BSP --- */
 	}
 
 	/*

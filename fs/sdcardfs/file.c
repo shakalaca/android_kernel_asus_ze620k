@@ -23,6 +23,11 @@
 #include <linux/backing-dev.h>
 #endif
 
+#define ENABLE_SDCARD_LOW_FS_SEEK	1
+#ifdef ENABLE_SDCARD_LOW_FS_SEEK
+#include "../fs/mount.h"
+#endif
+
 static ssize_t sdcardfs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -62,6 +67,7 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	int err;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct inode *inode = d_inode(dentry);
 
 	/* check disk space */
 	if (!check_min_free_space(dentry, count, 0)) {
@@ -73,10 +79,12 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	err = vfs_write(lower_file, buf, count, ppos);
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
-		fsstack_copy_inode_size(d_inode(dentry),
-					file_inode(lower_file));
-		fsstack_copy_attr_times(d_inode(dentry),
-					file_inode(lower_file));
+		if (sizeof(loff_t) > sizeof(long))
+			inode_lock(inode);
+		fsstack_copy_inode_size(inode, file_inode(lower_file));
+		fsstack_copy_attr_times(inode, file_inode(lower_file));
+		if (sizeof(loff_t) > sizeof(long))
+			inode_unlock(inode);
 	}
 
 	return err;
@@ -369,6 +377,84 @@ out:
 	return err;
 }
 
+#ifdef ENABLE_SDCARD_LOW_FS_SEEK
+static loff_t sdcardfs_sdcard_file_llseek(struct file *file, loff_t offset, int whence)
+{
+	loff_t err;
+	loff_t errlow;
+	char *path_buff;
+	char *p_path;
+	struct file *lower_file;
+
+	struct mount *mnt = NULL;
+	struct dentry *mountpointdentry = NULL;
+
+	err = generic_file_llseek(file, offset, whence);
+	if (err < 0) {
+		printk(KERN_ERR "%s: fail: offset:%lld ,whence:%d\n",__func__,offset,whence);
+	} else {
+		lower_file = sdcardfs_lower_file(file);
+		if(lower_file) {
+			path_buff = kmalloc(PATH_MAX, GFP_KERNEL);
+			memset(path_buff, '\0', PATH_MAX);
+			p_path = dentry_path_raw(lower_file->f_path.dentry,path_buff,(PATH_MAX-1));
+			if(p_path) {
+				//printk
+				pr_debug(KERN_ERR "%s: raw path: %s  \n",__func__,p_path);
+
+				// get mount point
+				mnt = real_mount(lower_file->f_path.mnt);
+				mountpointdentry = dget(mnt->mnt_mountpoint);
+				p_path = dentry_path_raw(mountpointdentry,path_buff,(PATH_MAX-1));
+
+				if(p_path) {
+					//printk
+					pr_debug(KERN_ERR "%s: raw mount point: %s  \n",__func__,p_path);
+
+					if (strstr(p_path, "media_rw")){
+						//printk
+						pr_debug(KERN_ERR "%s: file is on sd card or usb storage \n",__func__);
+						lower_file = sdcardfs_lower_file(file);
+						errlow = generic_file_llseek(lower_file, offset, whence);
+						if(err != errlow) {
+							pr_debug(KERN_ERR "%s: media_rw fail: offset:%lld ,whence:%d\n",__func__,offset,whence);
+							if ( whence == SEEK_CUR ) {
+								pr_debug(KERN_ERR "%s: SEEK_CUR --> err: %lld, errlow: %lld \n",__func__, err, errlow);
+								errlow = generic_file_llseek(lower_file, err, SEEK_SET);
+								if(errlow<0) {
+									printk(KERN_ERR "%s: SEEK_END --> err: %lld, errlow: %lld \n",__func__, err, errlow);
+								}
+							} else if ( whence == SEEK_END ) {
+								pr_debug(KERN_ERR "%s: SEEK_END --> err: %lld, errlow: %lld \n",__func__, err, errlow);
+								err = generic_file_llseek(file, errlow, SEEK_SET);
+								if(err<0) {
+									printk(KERN_ERR "%s: SEEK_END --> err: %lld, errlow: %lld \n",__func__, err, errlow);
+								}
+							}else if ( whence == SEEK_SET ) {
+								printk(KERN_ERR "%s: SEEK_SET --> err: %lld, errlow: %lld \n",__func__, err, errlow);
+							}
+						}
+					}
+				} else {
+					printk(KERN_ERR "%s: no raw mount point \n",__func__);
+				}
+
+			} else {
+				printk(KERN_ERR "%s: no raw path \n",__func__);
+			}
+
+			kfree(path_buff);
+		} else {
+			printk(KERN_ERR "%s: no lower_file \n",__func__);
+			return -1;
+		}
+	}
+
+	return err;
+}
+
+#endif //#ifdef ENABLE_SDCARD_LOW_FS_SEEK
+
 /*
  * Sdcardfs read_iter, redirect modified iocb to lower read_iter
  */
@@ -403,6 +489,7 @@ ssize_t sdcardfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	int err;
 	struct file *file = iocb->ki_filp, *lower_file;
+	struct inode *inode = file->f_path.dentry->d_inode;
 
 	lower_file = sdcardfs_lower_file(file);
 	if (!lower_file->f_op->write_iter) {
@@ -417,17 +504,23 @@ ssize_t sdcardfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 	fput(lower_file);
 	/* update upper inode times/sizes as needed */
 	if (err >= 0 || err == -EIOCBQUEUED) {
-		fsstack_copy_inode_size(file->f_path.dentry->d_inode,
-					file_inode(lower_file));
-		fsstack_copy_attr_times(file->f_path.dentry->d_inode,
-					file_inode(lower_file));
+		if (sizeof(loff_t) > sizeof(long))
+			inode_lock(inode);
+		fsstack_copy_inode_size(inode, file_inode(lower_file));
+		fsstack_copy_attr_times(inode, file_inode(lower_file));
+		if (sizeof(loff_t) > sizeof(long))
+			inode_unlock(inode);
 	}
 out:
 	return err;
 }
 
 const struct file_operations sdcardfs_main_fops = {
+#ifdef ENABLE_SDCARD_LOW_FS_SEEK
+	.llseek		= sdcardfs_sdcard_file_llseek,
+#else
 	.llseek		= generic_file_llseek,
+#endif
 	.read		= sdcardfs_read,
 	.write		= sdcardfs_write,
 	.unlocked_ioctl	= sdcardfs_unlocked_ioctl,

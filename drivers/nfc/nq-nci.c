@@ -46,7 +46,7 @@ static const struct of_device_id msm_match_table[] = {
 MODULE_DEVICE_TABLE(of, msm_match_table);
 
 #define MAX_BUFFER_SIZE			(320)
-#define WAKEUP_SRC_TIMEOUT		(5000)
+#define WAKEUP_SRC_TIMEOUT		(2000)
 #define MAX_RETRY_COUNT			3
 
 struct nqx_dev {
@@ -136,9 +136,8 @@ static irqreturn_t nqx_dev_irq_handler(int irq, void *dev_id)
 	struct nqx_dev *nqx_dev = dev_id;
 	unsigned long flags;
 
-	if (device_may_wakeup(&nqx_dev->client->dev)) {
+	if (device_may_wakeup(&nqx_dev->client->dev))
 		pm_wakeup_event(&nqx_dev->client->dev, WAKEUP_SRC_TIMEOUT);
-	}
 
 	nqx_disable_irq(nqx_dev);
 	spin_lock_irqsave(&nqx_dev->irq_enabled_lock, flags);
@@ -468,39 +467,43 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 		dev_dbg(&nqx_dev->client->dev,
 			"gpio_set_value disable: %s: info: %p\n",
 			__func__, nqx_dev);
-		if (gpio_is_valid(nqx_dev->firm_gpio))
+		if (gpio_is_valid(nqx_dev->firm_gpio)) {
 			gpio_set_value(nqx_dev->firm_gpio, 0);
+			usleep_range(10000, 10100);
+		}
 
 		if (gpio_is_valid(nqx_dev->ese_gpio)) {
 			if (!gpio_get_value(nqx_dev->ese_gpio)) {
 				dev_dbg(&nqx_dev->client->dev, "disabling en_gpio\n");
 				gpio_set_value(nqx_dev->en_gpio, 0);
+				usleep_range(10000, 10100);
 			} else {
 				dev_dbg(&nqx_dev->client->dev, "keeping en_gpio high\n");
 			}
 		} else {
 			dev_dbg(&nqx_dev->client->dev, "ese_gpio invalid, set en_gpio to low\n");
 			gpio_set_value(nqx_dev->en_gpio, 0);
+			usleep_range(10000, 10100);
 		}
 		r = nqx_clock_deselect(nqx_dev);
 		if (r < 0)
 			dev_err(&nqx_dev->client->dev, "unable to disable clock\n");
 		nqx_dev->nfc_ven_enabled = false;
-		/* hardware dependent delay */
-		msleep(100);
 	} else if (arg == 1) {
 		nqx_enable_irq(nqx_dev);
 		dev_dbg(&nqx_dev->client->dev,
 			"gpio_set_value enable: %s: info: %p\n",
 			__func__, nqx_dev);
-		if (gpio_is_valid(nqx_dev->firm_gpio))
+		if (gpio_is_valid(nqx_dev->firm_gpio)) {
 			gpio_set_value(nqx_dev->firm_gpio, 0);
+			usleep_range(10000, 10100);
+		}
 		gpio_set_value(nqx_dev->en_gpio, 1);
+		usleep_range(10000, 10100);
 		r = nqx_clock_select(nqx_dev);
 		if (r < 0)
 			dev_err(&nqx_dev->client->dev, "unable to enable clock\n");
 		nqx_dev->nfc_ven_enabled = true;
-		msleep(20);
 	} else if (arg == 2) {
 		/*
 		 * We are switching to Dowload Mode, toggle the enable pin
@@ -518,14 +521,15 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 			nqx_enable_irq(nqx_dev);
 		}
 		gpio_set_value(nqx_dev->en_gpio, 1);
-		msleep(20);
-		if (gpio_is_valid(nqx_dev->firm_gpio))
+		usleep_range(10000, 10100);
+		if (gpio_is_valid(nqx_dev->firm_gpio)) {
 			gpio_set_value(nqx_dev->firm_gpio, 1);
-		msleep(20);
+			usleep_range(10000, 10100);
+		}
 		gpio_set_value(nqx_dev->en_gpio, 0);
-		msleep(100);
+		usleep_range(10000, 10100);
 		gpio_set_value(nqx_dev->en_gpio, 1);
-		msleep(20);
+		usleep_range(10000, 10100);
 	} else {
 		r = -ENOIOCTLCMD;
 	}

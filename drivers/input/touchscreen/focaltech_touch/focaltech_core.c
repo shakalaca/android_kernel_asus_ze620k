@@ -71,11 +71,11 @@ u8 FTS_gesture_register_d7;
 
 //struct wake_lock ps_lock1;
 extern int g_asus_lcdID;
-extern void asus_psensor_disable_touch(bool enable);
-extern bool g_FP_Disable_Touch ;
+//preP porting
+//extern void asus_psensor_disable_touch(bool enable);
+//extern bool g_FP_Disable_Touch ;
 extern int get_audiomode(void);
-extern u32 asus_lcd_hw_id_0xDC;
-extern u32 asus_lcd_hw_id_0xDA;
+extern u32 asus_lcd_read_hw_id(void);
 extern bool g_asus_lcd_power_off;
 
 unsigned char IC_FW;
@@ -86,6 +86,7 @@ int g_focal_touch_init_status = 0;
 EXPORT_SYMBOL(g_focal_touch_init_status);
 
 bool disable_tp_flag;
+//preP porting
 extern int HALLsensor_gpio_value(void);
 
 EXPORT_SYMBOL(disable_tp_flag);
@@ -233,7 +234,8 @@ void ftxxxx_disable_touch(bool flag)
 			printk("[Focal][Touch] %s: proximity trigger enable touch  !\n", __func__);
 		}
 	}else{
-		asus_psensor_disable_touch(flag);
+		//preP porting
+		//asus_psensor_disable_touch(flag);
 	}
 	
 }
@@ -532,6 +534,8 @@ static int fts_input_dev_report_key_event(struct ts_event *event, struct fts_ts_
         if ( (1 == event->touch_point || 1 == event->point_num) &&
              (event->au16_y[0] == data->pdata->key_y_coord))
         {
+			//preP porting
+			/*
 			if (g_FP_Disable_Touch == 1){
 				printk("[focal][touch] fp disable touch \n");
 				for (i = 0; i < data->pdata->key_number; i++)
@@ -542,6 +546,7 @@ static int fts_input_dev_report_key_event(struct ts_event *event, struct fts_ts_
 				input_sync(data->input_dev);
 				return 0;
 			}
+			*/
             if (event->point_num == 0)
             {
                 FTS_DEBUG("Keys All Up!");
@@ -549,6 +554,7 @@ static int fts_input_dev_report_key_event(struct ts_event *event, struct fts_ts_
                 {
 					if (hall_sensor_detect)
 						msleep(20);
+					//preP porting
 					if ((HALLsensor_gpio_value() > 0) || (key_already_down == true))
 					{
 						input_report_key(data->input_dev, data->pdata->keys[i], 0);
@@ -577,6 +583,7 @@ static int fts_input_dev_report_key_event(struct ts_event *event, struct fts_ts_
                         {
 							if (hall_sensor_detect)
 								msleep(20);
+							//preP porting
 							if (HALLsensor_gpio_value() > 0)
 							{
 								if(once_key_event == false){
@@ -597,6 +604,7 @@ static int fts_input_dev_report_key_event(struct ts_event *event, struct fts_ts_
                         {
 							if (hall_sensor_detect)
 								msleep(20);
+							//preP porting
 							if ((HALLsensor_gpio_value() > 0) || (key_already_down == true))
 							{
 								input_report_key(data->input_dev, data->pdata->keys[i], 0);
@@ -1989,8 +1997,7 @@ static ssize_t fts_show_tpfwver(struct switch_dev *sdev, char *buf)
 		#if defined(ASUS_FTM_BUILD) || defined(ASUS_FTM)
 		num_read_chars = snprintf(buf, PAGE_SIZE, "0x%x-0x%x\n", g_vendor_id, IC_FW);
 		#else
-		num_read_chars = snprintf(buf, PAGE_SIZE, (asus_lcd_hw_id_0xDC > 0xf ? "0x%x-0x%x-0x%x%x\n" : "0x%x-0x%x-0x%x0%x\n"),
-			g_vendor_id, IC_FW, asus_lcd_hw_id_0xDA, asus_lcd_hw_id_0xDC);
+		num_read_chars = snprintf(buf, PAGE_SIZE, "0x%x-0x%x-0x%x\n", g_vendor_id, IC_FW, asus_lcd_read_hw_id());
 		#endif
 	}
 	return num_read_chars;

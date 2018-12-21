@@ -20,10 +20,6 @@
 
 DEFINE_MUTEX(pm_mutex);
 
-//ASUS_BSP +++
-extern bool rtc_wake_control; /* /kernel/msm-4.4/drivers/rtc/qpnp-rtc.c ,default is N */
-//ASUS_BSP ---
-
 #ifdef CONFIG_PM_SLEEP
 
 /* Routines for PM-transition notifications */
@@ -561,12 +557,7 @@ static ssize_t wake_lock_store(struct kobject *kobj,
 			       struct kobj_attribute *attr,
 			       const char *buf, size_t n)
 {
-//ASUS_BSP +++
-	int error = 0;
-	if (!rtc_wake_control) {
-		error = pm_wake_lock(buf);
-	}
-//ASUS_BSP ---
+	int error = pm_wake_lock(buf);
 	return error ? error : n;
 }
 

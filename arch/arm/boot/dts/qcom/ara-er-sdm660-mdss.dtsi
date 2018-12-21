@@ -402,7 +402,7 @@
 						00 00 10 8f];
 		};
 	};
-
+	
 	qcom,mdss_wb_panel {
 		compatible = "qcom,mdss_wb";
 		qcom,mdss_pan_res = <640 480>;

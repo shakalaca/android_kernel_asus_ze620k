@@ -3,7 +3,7 @@
  * MSM 7k High speed uart driver
  *
  * Copyright (c) 2008 Google Inc.
- * Copyright (c) 2007-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2018, The Linux Foundation. All rights reserved.
  * Modified: Nick Pelly <npelly@google.com>
  *
  * All source code in this file is licensed under the following license
@@ -66,6 +66,7 @@
 #include <linux/msm-sps.h>
 #include <linux/platform_data/msm_serial_hs.h>
 #include <linux/msm-bus.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "msm_serial_hs_hwreg.h"
 #define UART_SPS_CONS_PERIPHERAL 0
@@ -76,8 +77,6 @@
 #define IPC_MSM_HS_LOG_DATA_PAGES 3
 #define UART_DMA_DESC_NR 8
 #define BUF_DUMP_SIZE 32
-
-static int sys_suspend_noirq_cnt;
 
 /* If the debug_mask gets set to FATAL_LEV,
  * a fatal error has happened and further IPC logging
@@ -260,6 +259,7 @@ struct msm_hs_port {
 	atomic_t client_count;
 	bool obs; /* out of band sleep flag */
 	atomic_t client_req_state;
+	int sys_suspend_noirq_cnt;
 	void *ipc_msm_hs_log_ctxt;
 	void *ipc_msm_hs_pwr_ctxt;
 	int ipc_debug_mask;
@@ -397,8 +397,6 @@ static void msm_hs_resource_unvote(struct msm_hs_port *msm_uport)
 {
 	struct uart_port *uport = &(msm_uport->uport);
 	int rc = atomic_read(&msm_uport->resource_count);
-	struct msm_hs_tx *tx = &msm_uport->tx;
-	struct msm_hs_rx *rx = &msm_uport->rx;
 
 	MSM_HS_DBG("%s(): power usage count %d", __func__, rc);
 	if (rc <= 0) {
@@ -407,15 +405,8 @@ static void msm_hs_resource_unvote(struct msm_hs_port *msm_uport)
 		return;
 	}
 	atomic_dec(&msm_uport->resource_count);
-
-	if (pm_runtime_enabled(uport->dev)) {
-		pm_runtime_mark_last_busy(uport->dev);
-		pm_runtime_put_autosuspend(uport->dev);
-	} else {
-		MSM_HS_DBG("%s():tx.flush:%d,in_flight:%d,rx.flush:%d\n",
-		__func__, tx->flush, tx->dma_in_flight, rx->flush);
-		msm_hs_pm_suspend(uport->dev);
-	}
+	pm_runtime_mark_last_busy(uport->dev);
+	pm_runtime_put_autosuspend(uport->dev);
 }
 
  /* Vote for resources before accessing them */
@@ -1392,8 +1383,9 @@ static void msm_hs_disconnect_rx(struct uart_port *uport)
 	if (msm_uport->rx.flush == FLUSH_NONE)
 		msm_uport->rx.flush = FLUSH_STOP;
 
-	if (sps_is_pipe_empty(sps_pipe_handle, &prod_empty)) {
-		MSM_HS_WARN("%s():Pipe Not Empty, ret=%d, flush=%d\n",
+	if (!sps_is_pipe_empty(sps_pipe_handle, &prod_empty)) {
+		if (prod_empty == false)
+		MSM_HS_WARN("%s():Pipe Not Empty, prod=%d, flush=%d\n",
 			__func__, prod_empty, msm_uport->rx.flush);
 	}
 	disconnect_rx_endpoint(msm_uport);
@@ -2665,6 +2657,7 @@ static int msm_hs_startup(struct uart_port *uport)
 	int ret;
 	int rfr_level;
 	unsigned long flags;
+	u32 irq_type;
 	unsigned int data;
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 	struct circ_buf *tx_buf = &uport->state->xmit;
@@ -2685,8 +2678,11 @@ static int msm_hs_startup(struct uart_port *uport)
 	msm_hs_resource_vote(msm_uport);
 
 	if (is_use_low_power_wakeup(msm_uport)) {
+		irq_type = irq_get_trigger_type(msm_uport->wakeup.irq);
+		if (irq_type == IRQ_TYPE_NONE)
+			irq_type = IRQ_TYPE_EDGE_FALLING;
 		ret = request_irq(msm_uport->wakeup.irq, msm_hs_wakeup_isr,
-					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+					irq_type | IRQF_ONESHOT,
 					"msm_hs_wakeup", msm_uport);
 		if (unlikely(ret)) {
 			MSM_HS_ERR("%s():Err getting uart wakeup_irq %d\n",
@@ -3229,13 +3225,6 @@ static void msm_hs_pm_suspend(struct device *dev)
 		goto err_suspend;
 	mutex_lock(&msm_uport->mtx);
 
-	if (msm_uport->pm_state == MSM_HS_PM_SUSPENDED) {
-		MSM_HS_WARN("%s():Request to suspend when suspended",
-			__func__);
-		mutex_unlock(&msm_uport->mtx);
-		return;
-	}
-
 	client_count = atomic_read(&msm_uport->client_count);
 	msm_uport->pm_state = MSM_HS_PM_SUSPENDED;
 	msm_hs_resource_off(msm_uport);
@@ -3277,10 +3266,8 @@ static int msm_hs_pm_resume(struct device *dev)
 
 	mutex_lock(&msm_uport->mtx);
 	client_count = atomic_read(&msm_uport->client_count);
-	if (msm_uport->pm_state == MSM_HS_PM_ACTIVE) {
-		sys_suspend_noirq_cnt = 0;
+	if (msm_uport->pm_state == MSM_HS_PM_ACTIVE)
 		goto exit_pm_resume;
-	}
 	if (!atomic_read(&msm_uport->client_req_state))
 		disable_wakeup_interrupt(msm_uport);
 
@@ -3301,12 +3288,12 @@ static int msm_hs_pm_resume(struct device *dev)
 	}
 	obs_manage_irq(msm_uport, true);
 	msm_uport->pm_state = MSM_HS_PM_ACTIVE;
-	sys_suspend_noirq_cnt = 0;
 	msm_hs_resource_on(msm_uport);
 
 	LOG_USR_MSG(msm_uport->ipc_msm_hs_pwr_ctxt,
 		"%s:PM State:Active client_count %d\n", __func__, client_count);
 exit_pm_resume:
+	msm_uport->sys_suspend_noirq_cnt = 0;
 	mutex_unlock(&msm_uport->mtx);
 	return ret;
 }
@@ -3320,6 +3307,7 @@ static int msm_hs_pm_sys_suspend_noirq(struct device *dev)
 
 	if (IS_ERR_OR_NULL(msm_uport))
 		return -ENODEV;
+	mutex_lock(&msm_uport->mtx);
 	/*
 	 * If there is an active clk request or an impending userspace request
 	 * fail the suspend callback.
@@ -3327,16 +3315,13 @@ static int msm_hs_pm_sys_suspend_noirq(struct device *dev)
 	clk_cnt = atomic_read(&msm_uport->resource_count);
 	client_count = atomic_read(&msm_uport->client_count);
 	if (msm_uport->pm_state == MSM_HS_PM_ACTIVE) {
-		MSM_HS_WARN("%s:Fail Suspend.clk_cnt:%d,clnt_count:%d\n",
-				__func__, clk_cnt, client_count);
-
 		if (clk_cnt == 0 && client_count == 0)
-			sys_suspend_noirq_cnt++;
-		/*Force suspend only in second attempt, due to autosuspend
+			msm_uport->sys_suspend_noirq_cnt++;
+		/*Serve force suspend post autosuspend timer expires
 		 */
-		if (sys_suspend_noirq_cnt >= 2) {
-			mutex_lock(&msm_uport->mtx);
+		if (msm_uport->sys_suspend_noirq_cnt >= 2) {
 			msm_uport->pm_state = MSM_HS_PM_SYS_SUSPENDED;
+			msm_uport->sys_suspend_noirq_cnt = 0;
 			mutex_unlock(&msm_uport->mtx);
 
 			msm_hs_pm_suspend(dev);
@@ -3349,16 +3334,21 @@ static int msm_hs_pm_sys_suspend_noirq(struct device *dev)
 			pm_runtime_disable(dev);
 			pm_runtime_set_suspended(dev);
 			pm_runtime_enable(dev);
-			sys_suspend_noirq_cnt = 0;
-			LOG_USR_MSG(msm_uport->ipc_msm_hs_pwr_ctxt,
-				"%s:PM State:Sys-Suspended client_count %d\n",
-				__func__, client_count);
+
+			/*To Balance out exit time Mutex unlock */
+			mutex_lock(&msm_uport->mtx);
 		} else {
 			ret = -EBUSY;
-			goto exit_suspend_noirq;
 		}
 	}
-exit_suspend_noirq:
+	mutex_unlock(&msm_uport->mtx);
+	if (ret)
+		MSM_HS_WARN("%s:Fail Suspend.clk_cnt:%d,clnt_count:%d\n",
+			__func__, clk_cnt, client_count);
+	else
+		LOG_USR_MSG(msm_uport->ipc_msm_hs_pwr_ctxt,
+			"%s:PM State:Sys-Suspended client_count %d\n",
+			__func__, client_count);
 	return ret;
 };
 
@@ -3428,6 +3418,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 	struct msm_serial_hs_platform_data *pdata = pdev->dev.platform_data;
 	unsigned long data;
 	char name[30];
+	char boot_marker[40];
 
 	if (pdev->dev.of_node) {
 		dev_dbg(&pdev->dev, "device tree enabled\n");
@@ -3452,6 +3443,10 @@ static int msm_hs_probe(struct platform_device *pdev)
 		}
 		pdev->dev.platform_data = pdata;
 	}
+
+	snprintf(boot_marker, sizeof(boot_marker),
+			"M - DRIVER MSM HS-UART_%d Init", pdev->id);
+	place_marker(boot_marker);
 
 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
 		dev_err(&pdev->dev, "Invalid plaform device ID = %d\n",
@@ -3686,6 +3681,9 @@ static int msm_hs_probe(struct platform_device *pdev)
 	if (!ret) {
 		msm_hs_clk_bus_unvote(msm_uport);
 		msm_serial_hs_rt_init(uport);
+		snprintf(boot_marker, sizeof(boot_marker),
+				"M - DRIVER MSM HS-UART_%d Ready", pdev->id);
+		place_marker(boot_marker);
 		return ret;
 	}
 
@@ -3844,11 +3842,10 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	if (atomic_read(&msm_uport->client_count)) {
 		MSM_HS_WARN("%s: Client vote on, forcing to 0\n", __func__);
 		atomic_set(&msm_uport->client_count, 0);
-		LOG_USR_MSG(msm_uport->ipc_msm_hs_pwr_ctxt,
-			"%s: Client_Count 0\n", __func__);
 	}
 	msm_hs_unconfig_uart_gpios(uport);
-	MSM_HS_INFO("%s:UART port closed successfully\n", __func__);
+	LOG_USR_MSG(msm_uport->ipc_msm_hs_pwr_ctxt,
+		"%s:UART port closed, Client_Count 0\n", __func__);
 }
 
 static void __exit msm_serial_hs_exit(void)

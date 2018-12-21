@@ -1324,8 +1324,11 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	struct mdss_panel_data *pdata;
 	struct fb_info *fbi;
 	struct mdss_overlay_private *mdp5_data = NULL;
-	struct msmfb_mdp_pp mdp_pp;
 	int rc;
+
+#ifdef ASUS_ZE620KL_PROJECT
+	struct msmfb_mdp_pp mdp_pp;
+#endif
 
 	if (fbi_list_index >= MAX_FBI_LIST)
 		return -ENOMEM;
@@ -1483,10 +1486,11 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	mfd->early_unblank_work_queued = false;
 	mfd->early_unblank_bl_value = 0;
 
-#if defined(ASUS_FTM_BUILD) || defined(ASUS_FTM)
+#ifdef ASUS_FTM_BUILD
 	printk(KERN_EMERG "[DISP] Disable True2life feature\n");
 	return rc;
 #endif
+#ifdef ASUS_ZE620KL_PROJECT
 	if(mfd->index == 0) {
 		printk(KERN_EMERG "[DISP] Set True2life initail value for FB0\n");
 		memset(&mdp_pp, 0x00 , sizeof(struct msmfb_mdp_pp));
@@ -1511,7 +1515,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		rc = mdss_mdp_ad_config(mfd, &mdp_pp.data.ad_init_cfg);
 		rc =0;
 	}
-
+#endif
 	return rc;
 }
 
@@ -1787,6 +1791,7 @@ static int mdss_fb_pm_suspend(struct device *dev)
 	}
 
 	return rc;
+
 }
 
 static int mdss_fb_pm_resume(struct device *dev)
@@ -3925,8 +3930,11 @@ skip_commit:
 	if (IS_ERR_VALUE(ret) || !sync_pt_data->flushed) {
 		mdss_fb_release_kickoff(mfd);
 		mdss_fb_signal_timeline(sync_pt_data);
-	}
 
+		if ((mfd->panel.type == MIPI_CMD_PANEL) &&
+			(mfd->mdp.signal_retire_fence))
+			mfd->mdp.signal_retire_fence(mfd, 1);
+	}
 	if (dynamic_dsi_switch) {
 		MDSS_XLOG(mfd->index, mfd->split_mode, new_dsi_mode,
 			XLOG_FUNC_EXIT);
@@ -4840,6 +4848,7 @@ static int mdss_fb_atomic_commit_ioctl(struct fb_info *info,
 	struct mdp_destination_scaler_data *ds_data = NULL;
 	struct mdp_destination_scaler_data __user *ds_data_user;
 	struct msm_fb_data_type *mfd;
+	struct mdss_overlay_private *mdp5_data = NULL;
 
 	ret = copy_from_user(&commit, argp, sizeof(struct mdp_layer_commit));
 	if (ret) {
@@ -4851,9 +4860,20 @@ static int mdss_fb_atomic_commit_ioctl(struct fb_info *info,
 	if (!mfd)
 		return -EINVAL;
 
+	mdp5_data = mfd_to_mdp5_data(mfd);
+
 	if (mfd->panel_info->panel_dead) {
 		pr_debug("early commit return\n");
 		MDSS_XLOG(mfd->panel_info->panel_dead);
+		/*
+		 * In case of an ESD attack, since we early return from the
+		 * commits, we need to signal the outstanding fences.
+		 */
+		mdss_fb_release_fences(mfd);
+		if ((mfd->panel.type == MIPI_CMD_PANEL) &&
+			mfd->mdp.signal_retire_fence && mdp5_data)
+			mfd->mdp.signal_retire_fence(mfd,
+						mdp5_data->retire_cnt);
 		return 0;
 	}
 
@@ -4879,6 +4899,7 @@ static int mdss_fb_atomic_commit_ioctl(struct fb_info *info,
 	input_layer_list = commit.commit_v1.input_layers;
 
 	if (layer_count > MAX_LAYER_COUNT) {
+		pr_err("invalid layer count :%d\n", layer_count);
 		ret = -EINVAL;
 		goto err;
 	} else if (layer_count) {
@@ -5144,7 +5165,9 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	struct mdp_buf_sync buf_sync;
 	unsigned int dsi_mode = 0;
 	struct mdss_panel_data *pdata = NULL;
+#ifndef ASUS_ZC600KL_PROJECT
 	int panel_cabc_mode = Still_MODE;	// ASUS BSP Display +++
+#endif
 
 	if (!info || !info->par)
 		return -EINVAL;
@@ -5207,6 +5230,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		break;
 
 	// ASUS BSP Display +++
+#ifndef ASUS_ZC600KL_PROJECT
 	case MSMFB_CABC_CTRL:
 		ret = copy_from_user(&panel_cabc_mode, argp, sizeof(panel_cabc_mode));
 		if (ret) {
@@ -5220,6 +5244,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
         asus_lcd_cabc_mode[1] = panel_cabc_mode;
         asus_tcon_cmd_set(asus_lcd_cabc_mode, ARRAY_SIZE(asus_lcd_cabc_mode));
 		break;
+#endif
 	// ASUS BSP Display ---
 
 	case MSMFB_LPM_ENABLE:

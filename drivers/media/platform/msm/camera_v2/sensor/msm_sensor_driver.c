@@ -746,7 +746,7 @@ static int32_t msm_sensor_driver_is_special_support(
 {
 	int32_t rc = 0, i = 0;
 	struct msm_camera_sensor_board_info *sensordata = s_ctrl->sensordata;
-
+printk("%s %d %s %s\n",__func__,__LINE__,sensordata->special_support_sensors[i],sensor_name);
 	for (i = 0; i < sensordata->special_support_size; i++) {
 		if (!strcmp(sensordata->special_support_sensors[i],
 						 sensor_name)) {
@@ -1135,7 +1135,6 @@ CSID_TG:
 	 * probed on this slot
 	 */
 	s_ctrl->is_probe_succeed = 1;
-
 	return rc;
 
 camera_power_down:
@@ -1465,8 +1464,8 @@ static int32_t msm_sensor_driver_i2c_probe(struct i2c_client *client,
 				rc);
 			goto FREE_S_CTRL;
 		}
-		return rc;
 	}
+	return rc;
 FREE_S_CTRL:
 	kfree(s_ctrl);
 	return rc;

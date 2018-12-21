@@ -57,9 +57,9 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
-// ASUS_BSP +++ Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP +++ get permissive status
 #include <linux/kernel.h>
-// ASUS_BSP --- Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+// ASUS_BSP --- get permissive status
 
 struct scan_control {
 	/* How many pages shrink_list() should reclaim */
@@ -270,10 +270,13 @@ EXPORT_SYMBOL(register_shrinker);
  */
 void unregister_shrinker(struct shrinker *shrinker)
 {
+	if (!shrinker->nr_deferred)
+		return;
 	down_write(&shrinker_rwsem);
 	list_del(&shrinker->list);
 	up_write(&shrinker_rwsem);
 	kfree(shrinker->nr_deferred);
+	shrinker->nr_deferred = NULL;
 }
 EXPORT_SYMBOL(unregister_shrinker);
 
@@ -1409,6 +1412,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 
 		if (PageDirty(page)) {
 			struct address_space *mapping;
+			bool migrate_dirty;
 
 			/* ISOLATE_CLEAN means only clean pages */
 			if (mode & ISOLATE_CLEAN)
@@ -1417,10 +1421,19 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 			/*
 			 * Only pages without mappings or that have a
 			 * ->migratepage callback are possible to migrate
-			 * without blocking
+			 * without blocking. However, we can be racing with
+			 * truncation so it's necessary to lock the page
+			 * to stabilise the mapping as truncation holds
+			 * the page lock until after the page is removed
+			 * from the page cache.
 			 */
+			if (!trylock_page(page))
+				return ret;
+
 			mapping = page_mapping(page);
-			if (mapping && !mapping->a_ops->migratepage)
+			migrate_dirty = !mapping || mapping->a_ops->migratepage;
+			unlock_page(page);
+			if (!migrate_dirty)
 				return ret;
 		}
 	}
@@ -2194,11 +2207,17 @@ static void get_scan_count(struct lruvec *lruvec, int swappiness,
 	}
 
 	/*
-	 * There is enough inactive page cache, do not reclaim
-	 * anything from the anonymous working set right now.
+	 * If there is enough inactive page cache, i.e. if the size of the
+	 * inactive list is greater than that of the active list *and* the
+	 * inactive list actually has some pages to scan on this priority, we
+	 * do not reclaim anything from the anonymous working set right now.
+	 * Without the second condition we could end up never scanning an
+	 * lruvec even if it has plenty of old anonymous pages unless the
+	 * system is under heavy pressure.
 	 */
 	if (!IS_ENABLED(CONFIG_BALANCE_ANON_FILE_RECLAIM) &&
-			!inactive_file_is_low(lruvec)) {
+			!inactive_file_is_low(lruvec) &&
+			get_lru_size(lruvec, LRU_INACTIVE_FILE) >> sc->priority) {
 		scan_balance = SCAN_FILE;
 		goto out;
 	}
@@ -3795,21 +3814,21 @@ char g_szRD[DRDCmdMaxLength] = "";
 int g_count = 0;
 
 int wake_setselinux_wq(int nValue){
-	
-// ASUS_BSP +++ Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
+
+// ASUS_BSP +++ get permissive status
 	if(permissive_enable == 1 && nValue == 0)
 	{
 		printk("[SELinux] CmdLine : androidboot.selinux=permissive !!(%d)\n", nValue);
 		return 0;
 	}
-// ASUS_BSP --- Jiunhau_Wang [ZE554KL][DM][NA][NA] get permissive status
-	
+// ASUS_BSP --- get permissive status
+
 	if (strnstr(saved_command_line, "SB=Y", strlen(saved_command_line))){
 		if(strnstr(saved_command_line, "UNLOCKED=Y", strlen(saved_command_line))) {
 			printk("fuse device and unlock...\r\n");
 		}
 		else{
-			printk("fuse device and lock...\r\n");		
+			printk("fuse device and lock...\r\n");	
 			return 0;
 		}
 	}
@@ -3822,8 +3841,8 @@ int wake_setselinux_wq(int nValue){
 	g_bSetEnforceChanged = 1;
 	wake_up_interruptible(&RoutineWaitQueue);
 	g_count++;
-	return 1; 
-}	
+	return 1;
+}
 
 static ssize_t proc_rd_read(struct file *filp, char __user *buff, size_t len, loff_t *off)
 {
@@ -3833,7 +3852,6 @@ static ssize_t proc_rd_read(struct file *filp, char __user *buff, size_t len, lo
 	if (!nFlag)
 		return 0;
 
-	
 	ret = strlen(g_szRD);
 	iret = copy_to_user(buff, g_szRD, ret);
 	return ret;
@@ -3850,7 +3868,7 @@ static ssize_t proc_rd_write(struct file *filp, const char __user *buff, size_t 
 	{
 		return -EFAULT;
 	}
-	
+
 	g_szRD[len] = '\0';
 	pPos = strchr (g_szRD, ':');
 
@@ -3918,10 +3936,10 @@ static void routine_init(void)
 		return;
 
 	g_pRoutine = kthread_run(routine, NULL, "kroutined");
-	
+
 	if (g_pRoutine_timeout)
 		return;
-	
+
 	g_pRoutine_timeout = kthread_run(routine_timeout, NULL, "kroutined_timeout");
 }
 
@@ -4127,7 +4145,13 @@ int zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
  */
 int page_evictable(struct page *page)
 {
-	return !mapping_unevictable(page_mapping(page)) && !PageMlocked(page);
+	int ret;
+
+	/* Prevent address_space of inode and swap cache from being freed */
+	rcu_read_lock();
+	ret = !mapping_unevictable(page_mapping(page)) && !PageMlocked(page);
+	rcu_read_unlock();
+	return ret;
 }
 
 #ifdef CONFIG_SHMEM

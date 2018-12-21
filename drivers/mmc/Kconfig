@@ -33,7 +33,6 @@ config MMC_SUSPEND_TEST
        default n
        help
          If you say Y here, support will be added for mmc suspend stress testing.
-
 if MMC
 
 source "drivers/mmc/core/Kconfig"

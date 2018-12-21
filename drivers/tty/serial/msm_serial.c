@@ -1884,10 +1884,6 @@ static int __init msm_serial_init(void)
 {
 	int ret;
 
-	ret = uart_register_driver(&msm_uart_driver);
-	if (unlikely(ret))
-		return ret;
-
 #ifndef ASUS_USER_BUILD
 #ifdef CONFIG_BOOTDBGUART
 	if (!g_bootdbguart_y) {
@@ -1895,6 +1891,10 @@ static int __init msm_serial_init(void)
 	}
 #endif
 #endif
+
+	ret = uart_register_driver(&msm_uart_driver);
+	if (unlikely(ret))
+		return ret;
 
 	ret = platform_driver_register(&msm_platform_driver);
 	if (unlikely(ret))

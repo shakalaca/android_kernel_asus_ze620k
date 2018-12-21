@@ -13,25 +13,24 @@
  */
 
  /*******************************/
-/* IR Sensor Hardware Module */
+/* ALSPS Sensor Hardware Module */
 /******************************/
-#ifndef __LINUX_IRSENSOR_CM36686_H
-#define __LINUX_IRSENSOR_CM36686_H
+#ifndef __LINUX_ALSPS_CM36686_H
+#define __LINUX_ALSPS_CM36686_H
 
 #define CM36686_PROXIMITY_THDL_DEFAULT  	(12)
 #define CM36686_PROXIMITY_THDH_DEFAULT  	(30)
 #define CM36686_PROXIMITY_INF_DEFAULT  		(2)
 #define CM36686_PROXIMITY_AUTOK_MIN  		(3)
 #define CM36686_PROXIMITY_AUTOK_MAX  		(50)
-#define CM36686_LIGHT_200LUX_DEFAULT		(550)
-#define CM36686_LIGHT_1000LUX_DEFAULT		(2701)
+#define CM36656_LIGHT_CALIBRATION_DEFAULT (2701)
 #define CM36686_LIGHT_MAX_THRESHOLD		(65534)
 #define CM36686_NUM_REGS			(13)
 
 /*Define Command Code*/
 #define		ALS_CONF	0x00
 #define		ALS_THDH  	0x01
-#define		ALS_THDL	0x02
+#define		ALS_THDL		0x02
 #define		PS_CONF1    	0x03
 #define		PS_CONF3    	0x04
 #define		PS_CANC      	0x05
@@ -44,26 +43,26 @@
 
 /*for ALS CONF command*/
 //Integration
-#define CM36686_ALS_IT_MAX		(3)
-#define CM36686_ALS_IT_MASK		0x3F
+#define CM36686_ALS_IT_MAX	(3)
+#define CM36686_ALS_IT_MASK	0x3F
 #define CM36686_ALS_IT_SHIFT	(6)
-#define CM36686_ALS_IT_80MS 		(0)
+#define CM36686_ALS_IT_80MS 	(0)
 #define CM36686_ALS_IT_160MS 	(1)
 #define CM36686_ALS_IT_320MS 	(2)
 #define CM36686_ALS_IT_640MS 	(3)
 
 //Persistence
-#define CM36686_ALS_PERS_MAX	(3)
-#define CM36686_ALS_PERS_MASK	0xF3
-#define CM36686_ALS_PERS_SHIFT	(2)
+#define CM36686_ALS_PERS_MAX		(3)
+#define CM36686_ALS_PERS_MASK		0xF3
+#define CM36686_ALS_PERS_SHIFT		(2)
 #define CM36686_ALS_PERS_1 		(0)
 #define CM36686_ALS_PERS_2 		(1)
 #define CM36686_ALS_PERS_4 		(2)
 #define CM36686_ALS_PERS_8 		(3)
 
 #define CM36686_ALS_INT_EN	 	(1 << 1) /*enable/disable Interrupt*/
-#define CM36686_ALS_INT_MASK	0xFD
-#define CM36686_ALS_SD			  (1 << 0) /*enable/disable ALS func, 1:disable , 0: enable*/
+#define CM36686_ALS_INT_MASK		0xFD
+#define CM36686_ALS_SD			(1 << 0) /*enable/disable ALS func, 1:disable , 0: enable*/
 #define CM36686_ALS_SD_MASK		0xFE
 
 /*for PS CONF1 command*/
@@ -87,15 +86,15 @@
 
 //Persistence
 #define CM36686_PS_PERS_MAX		(3)
-#define CM36686_PS_PERS_MASK	0xCF
-#define CM36686_PS_PERS_SHIFT	(4)
+#define CM36686_PS_PERS_MASK		0xCF
+#define CM36686_PS_PERS_SHIFT		(4)
 #define CM36686_PS_PERS_1 	 		(0)
 #define CM36686_PS_PERS_2 	 		(1)
 #define CM36686_PS_PERS_3 	 		(2)
 #define CM36686_PS_PERS_4 	 		(3)
 
 //Integration
-#define CM36686_PS_IT_MAX		(7)
+#define CM36686_PS_IT_MAX			(7)
 #define CM36686_PS_IT_MASK		0xF1
 #define CM36686_PS_IT_SHIFT		(1)
 #define CM36686_PS_IT_1T 	   		(0)
@@ -107,19 +106,19 @@
 #define CM36686_PS_IT_4T 		 	(6)
 #define CM36686_PS_IT_8T 		 	(7)
 
-#define CM36686_PS_SD	       (1 << 0)/*enable/disable PS func, 1:disable , 0: enable*/
+#define CM36686_PS_SD			(1 << 0)/*enable/disable PS func, 1:disable , 0: enable*/
 #define CM36686_PS_SD_MASK	 0xFE
 
 /*for PS CONF3 command*/
-#define CM36686_PS_MS_NORMAL        (0 << 6)
-#define CM36686_PS_MS_LOGIC_ENABLE  (1 << 6)
+#define CM36686_PS_MS_NORMAL		(0 << 6)
+#define CM36686_PS_MS_LOGIC_ENABLE	(1 << 6)
 
 //LED Current
 #define CM36686_LED_I_MAX			(7)
 #define CM36686_LED_I_MASK		0xF8
 #define CM36686_LED_I_SHIFT		(0)
-#define CM36686_LED_I_50            	(0)
-#define CM36686_LED_I_75            	(1)
+#define CM36686_LED_I_50            		(0)
+#define CM36686_LED_I_75            		(1)
 #define CM36686_LED_I_100            	(2)
 #define CM36686_LED_I_120            	(3)
 #define CM36686_LED_I_140            	(4)
@@ -127,15 +126,15 @@
 #define CM36686_LED_I_180            	(6)
 #define CM36686_LED_I_200            	(7)
 
-#define CM36686_PS_SMART_PERS_ENABLE  (1 << 4)
-#define CM36686_PS_ACTIVE_FORCE_MODE  (1 << 3)
-#define CM36686_PS_ACTIVE_FORCE_TRIG  (1 << 2)
+#define CM36686_PS_SMART_PERS_ENABLE	(1 << 4)
+#define CM36686_PS_ACTIVE_FORCE_MODE	(1 << 3)
+#define CM36686_PS_ACTIVE_FORCE_TRIG	(1 << 2)
 
 /*for INT FLAG*/
-#define INT_FLAG_PS_SPFLAG           (1<<6)
-#define INT_FLAG_ALS_IF_L            (1<<5)
-#define INT_FLAG_ALS_IF_H            (1<<4)
-#define INT_FLAG_PS_IF_CLOSE         (1<<1)
-#define INT_FLAG_PS_IF_AWAY          (1<<0)  
+#define INT_FLAG_PS_SPFLAG		(1<<6)
+#define INT_FLAG_ALS_IF_L		(1<<5)
+#define INT_FLAG_ALS_IF_H		(1<<4)
+#define INT_FLAG_PS_IF_CLOSE	(1<<1)
+#define INT_FLAG_PS_IF_AWAY	(1<<0)  
 
 #endif
