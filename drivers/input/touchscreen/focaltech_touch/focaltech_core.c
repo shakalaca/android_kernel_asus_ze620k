@@ -77,6 +77,7 @@ extern int g_asus_lcdID;
 extern int get_audiomode(void);
 extern u32 asus_lcd_read_hw_id(void);
 extern bool g_asus_lcd_power_off;
+extern bool asus_lcd_tcon_cmd_fence;
 
 unsigned char IC_FW;
 u8 g_vendor_id = 0xFF;
@@ -1327,9 +1328,10 @@ static void fts_touch_irq_work(struct work_struct *work)
    		ret = fts_read_touchdata(fts_wq_data);
     	if (ret == 0 && (!disable_tp_flag))
 	   	{
-            
-	        fts_report_value(fts_wq_data);
-            
+            if (!asus_lcd_tcon_cmd_fence)
+			{
+				fts_report_value(fts_wq_data);
+			}
 	    }
 	}
 //    enable_irq(fts_wq_data->client->irq);
@@ -1371,9 +1373,10 @@ static irqreturn_t fts_ts_interrupt(int irq, void *dev_id)
         ret = fts_read_touchdata(fts_wq_data);
         if (ret == 0 && (!disable_tp_flag))
         {
-            
-            fts_report_value(fts_wq_data);
-            
+            if (!asus_lcd_tcon_cmd_fence)
+			{
+				fts_report_value(fts_wq_data);
+			}
 	    }
     }
    

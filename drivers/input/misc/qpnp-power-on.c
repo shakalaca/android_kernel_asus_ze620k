@@ -1034,12 +1034,14 @@ void set_vib_enable(int value)
 	printk("ASDF: set vibrator enable. (%s ms)\n", timeout_ms);
 }
 
-#define TIMEOUT_COUNT 55
+#define TIMEOUT_COUNT (timeout_count)
 #define TIMEOUT_CLEAR 30
 static struct work_struct __wait_for_power_key_6s_work;
 static unsigned long press_time;
 static unsigned long slowlog_time;
 extern void rm_lastshut_slowg(void);
+extern bool g_recovery_mode;
+int timeout_count = 55;
 
 static int saving_log = 0;
 static int slow_ok;
@@ -1049,6 +1051,11 @@ void wait_for_power_key_6s_work(struct work_struct *work)
 	int i, duration;
 	unsigned long timeout, startime;
 	int j;
+
+	if ( g_recovery_mode )
+		timeout_count = 90;
+	else if ( !g_recovery_mode)
+		timeout_count = 55;
 
 	if (!power_key_6s_running) {
 		if (!is_holding_power_key())
@@ -1127,7 +1134,7 @@ void wait_for_slowlog_work(struct work_struct *work)
 		}
 
 		if (((i == TIMEOUT_SLOW) || time_after_eq(jiffies, timeout)) &&
-		    (is_holding_power_key()) && (i > 0)) {
+		    (is_holding_power_key()) && (i > 0) && (!g_recovery_mode)) {
 			saving_log = 1;
 			printk("start to gi chk\n");
 			duration = (jiffies - startime) * 10 / HZ;

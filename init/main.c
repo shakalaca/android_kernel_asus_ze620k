@@ -290,6 +290,7 @@ EXPORT_SYMBOL(g_ASUS_prjID);
 
 //+++ ASUS_BSP : set recovery cmdline
 bool g_recovery_mode = false;
+EXPORT_SYMBOL(g_recovery_mode);
 static int set_recovery_mode(char *str)
 {
 	g_recovery_mode = true;

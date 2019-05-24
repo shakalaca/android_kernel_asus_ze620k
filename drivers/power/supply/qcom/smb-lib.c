@@ -4737,10 +4737,18 @@ void jeita_rule(void)
 		else
 			smblib_set_usb_suspend(smbchg_dev, false);
 		
-		if(ubatlife_chg_status == UBATLIFE_CHG_THD)
-			ubatlife_stop_charging_flag = false;
-		else				
+		if(ubatlife_chg_status == UBATLIFE_CHG_THD){
+			if(bat_capacity == UBATLIFE_DISCHG_THD)
+				ubatlife_stop_charging_flag = true;
+			else 
+				ubatlife_stop_charging_flag = false;
+		}else{
 			ubatlife_stop_charging_flag = true;
+		}
+		
+
+
+		
 	/* WeiYu: suspend_dismiss' priority is lower than the following list:
 		demo_app_property_flag
 		usb_alert_flag

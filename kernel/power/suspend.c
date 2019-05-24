@@ -53,6 +53,10 @@ static DECLARE_WAIT_QUEUE_HEAD(suspend_freeze_wait_head);
 enum freeze_state __read_mostly suspend_freeze_state;
 static DEFINE_SPINLOCK(suspend_freeze_lock);
 
+//ASUS_BSP: skip sync before suspend if too busy
+extern int suspend_skip_sync_flag;
+extern int is_sdhc_flag;
+
 void freeze_set_ops(const struct platform_freeze_ops *ops)
 {
 	lock_system_sleep();
@@ -559,11 +563,16 @@ static int enter_state(suspend_state_t state)
 		freeze_begin();
 
 #ifndef CONFIG_SUSPEND_SKIP_SYNC
-	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
-	printk("[PM] enter_state(), Syncing filesystems ... \n");
-	sys_sync();
-	printk("sys_sync(), done.\n");
-	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
+	//ASUS_BSP: skip sync to SDHC before suspend if too busy (loadavg >= 7)
+	if(suspend_skip_sync_flag && is_sdhc_flag){
+		printk("[PM] skip sync to SDHC before suspend ... \n");
+	}else{
+		trace_suspend_resume(TPS("sync_filesystems"), 0, true);
+		printk("[PM] enter_state(), Syncing filesystems ... \n");
+		sys_sync();
+		printk("sys_sync(), done.\n");
+		trace_suspend_resume(TPS("sync_filesystems"), 0, false);
+	}
 #endif
 
 	printk("[PM] suspend_prepare(), Preparing system for sleep (%s)\n", pm_states[state]);

@@ -523,10 +523,10 @@ enum calculation_time_type {
 struct BAT_HEALTH_DATA{
 	int magic;
 	int bat_current;
-	unsigned long bat_current_avg;
-	unsigned long accumulate_time; //second
-	unsigned long accumulate_current; //uA
-	unsigned long bat_health;
+	unsigned long long bat_current_avg;
+	unsigned long long accumulate_time; //second
+	unsigned long long accumulate_current; //uA
+	int bat_health;
 	unsigned long start_time;
 	unsigned long end_time;
 	
