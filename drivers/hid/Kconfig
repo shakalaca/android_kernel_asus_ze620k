@@ -492,7 +492,6 @@ config HID_MONTEREY
 config HID_MULTITOUCH
 	tristate "HID Multitouch panels"
 	depends on HID
-	default y
 	---help---
 	  Generic support for HID multitouch panels.
 

@@ -26,12 +26,6 @@
 #define ENABLE_SDCARD_LOW_FS_SEEK	1
 #ifdef ENABLE_SDCARD_LOW_FS_SEEK
 #include "../fs/mount.h"
-
-static inline void copy_i_size(struct inode *dest,
-					   const struct inode *src)
-{
-	dest->i_size = src->i_size;
-}
 #endif
 
 static ssize_t sdcardfs_read(struct file *file, char __user *buf,
@@ -40,9 +34,6 @@ static ssize_t sdcardfs_read(struct file *file, char __user *buf,
 	int err;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
-
-	pr_debug(KERN_ERR "%s begin \n",__func__);
-
 #ifdef CONFIG_SDCARD_FS_FADV_NOACTIVE
 	struct backing_dev_info *bdi;
 #endif
@@ -63,18 +54,9 @@ static ssize_t sdcardfs_read(struct file *file, char __user *buf,
 
 	err = vfs_read(lower_file, buf, count, ppos);
 	/* update our inode atime upon a successful lower read */
-#ifndef ENABLE_SDCARD_LOW_FS_SEEK
 	if (err >= 0)
 		fsstack_copy_attr_atime(d_inode(dentry),
 					file_inode(lower_file));
-#else
-	if (err >= 0) {
-		fsstack_copy_attr_atime(d_inode(dentry),
-					file_inode(lower_file));
-		//pr_debug(KERN_ERR "%s update i_size upon a successful lower read \n",__func__);
-		//copy_i_size(d_inode(dentry),file_inode(lower_file));
-	}
-#endif
 
 	return err;
 }
@@ -260,8 +242,6 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 	const struct cred *saved_cred = NULL;
 
-	pr_debug(KERN_ERR "%s begin \n",__func__);
-
 	/* don't open unhashed/deleted files */
 	if (d_unhashed(dentry)) {
 		err = -ENOENT;
@@ -304,31 +284,8 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 
 	if (err)
 		kfree(SDCARDFS_F(file));
-#ifndef ENABLE_SDCARD_LOW_FS_SEEK
 	else
 		sdcardfs_copy_and_fix_attrs(inode, sdcardfs_lower_inode(inode));
-#else
-	else {
-		pr_debug(KERN_ERR "%s: file->f_mode: 0x%x\n",__func__,file->f_mode);
-		if( (file->f_mode & FMODE_READ) == FMODE_READ && (file->f_mode & FMODE_WRITE) == 0) {
-			struct super_block *lower_sb;
-			lower_sb = lower_path.dentry->d_sb;
-			if(lower_sb->s_type->name) {
-				//printk/pr_debug
-				pr_debug(KERN_ERR "%s: raw file system type: %s  \n",__func__,lower_sb->s_type->name);
-				if (strstr(lower_sb->s_type->name, "fat")){
-					// not in internal
-					//printk/pr_debug
-					pr_debug(KERN_ERR "%s: (file->f_mode & FMODE_READ) == FMODE_READ && (file->f_mode & FMODE_WRITE) == 0) \n",__func__);
-					copy_i_size(d_inode(dentry),file_inode(lower_file));
-				}
-			}
-		}
-
-		sdcardfs_copy_and_fix_attrs(inode, sdcardfs_lower_inode(inode));
-	}
-#endif
-
 
 out_revert_cred:
 	revert_fsids(saved_cred);
