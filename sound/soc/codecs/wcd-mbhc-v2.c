@@ -2819,7 +2819,10 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 	if (!mbhc->mbhc_cfg->read_fw_bin ||
 	    (mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_fw) ||
 	    (mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_cal)) {
-		rc = wcd_mbhc_initialise(mbhc);
+		/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+		//rc = wcd_mbhc_initialise(mbhc);
+		pr_err("%s: Delay wcd_mbhc_initialise \n", __func__);
+		/* ASUS_BSP --- */
 	} else {
 		if (!mbhc->mbhc_fw || !mbhc->mbhc_cal)
 			schedule_delayed_work(&mbhc->mbhc_firmware_dwork,
@@ -3049,6 +3052,34 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 	init_waitqueue_head(&mbhc->wait_btn_press);
 	mutex_init(&mbhc->codec_resource_lock);
 
+/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+#ifdef ASUS_ZC600KL_PROJECT
+	mbhc_data.name = "h2w";
+	mbhc_data.index = 0;
+	mbhc_data.state = 0;
+	ret = switch_dev_register(&mbhc_data);
+	if (ret) {
+		pr_err("%s: Failed to register a switch device\n", __func__);
+	}
+#endif
+
+	pr_debug("%s: leave ret %d\n", __func__, ret);
+	return ret;
+/* ASUS_BSP --- */
+
+err:
+	pr_err("%s: leave err ret %d\n", __func__, ret);
+	return ret;
+
+}
+
+/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+int wcd_mbhc_init_irq(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec)
+{
+	int ret = 0;
+
+	pr_err("%s: enter\n", __func__);
+
 	ret = mbhc->mbhc_cb->request_irq(codec, mbhc->intr_ids->mbhc_sw_intr,
 				  wcd_mbhc_mech_plug_detect_irq,
 				  "mbhc sw intr", mbhc);
@@ -3123,17 +3154,14 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 		goto err_hphr_ocp_irq;
 	}
 
-#ifdef ASUS_ZC600KL_PROJECT
-	mbhc_data.name = "h2w";
-	mbhc_data.index = 0;
-	mbhc_data.state = 0;
-	ret = switch_dev_register(&mbhc_data);
-	if (ret) {
-		pr_err("%s: Failed to register a switch device\n", __func__);
+	if (!mbhc->mbhc_cfg->read_fw_bin ||
+		(mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_fw) ||
+		(mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_cal)) {
+			pr_err("%s: wcd_mbhc_initialise Begin\n", __func__);
+			ret = wcd_mbhc_initialise(mbhc);
 	}
-#endif
-
-	pr_debug("%s: leave ret %d\n", __func__, ret);
+	pr_err("%s: wcd_mbhc_initialise done(%d)\n", __func__, ret);
+	
 	return ret;
 
 err_hphr_ocp_irq:
@@ -3154,11 +3182,13 @@ err_mbhc_sw_irq:
 	if (mbhc->mbhc_cb->register_notifier)
 		mbhc->mbhc_cb->register_notifier(mbhc, &mbhc->nblock, false);
 	mutex_destroy(&mbhc->codec_resource_lock);
-err:
-	pr_debug("%s: leave ret %d\n", __func__, ret);
+
+	pr_err("%s: error leave ret %d\n", __func__, ret);
 	return ret;
 }
 EXPORT_SYMBOL(wcd_mbhc_init);
+EXPORT_SYMBOL(wcd_mbhc_init_irq);
+/* ASUS_BSP --- */
 
 void wcd_mbhc_deinit(struct wcd_mbhc *mbhc)
 {

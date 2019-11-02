@@ -4314,6 +4314,21 @@ static void remove_codec_status_proc_file(void)
 #endif /* #ifdef CONFIG_PROC_FS */
 /* ASUS_BSP Paul --- */
 
+/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+static void msm_anlg_cdc_soc_probe_delay_work(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct sdm660_cdc_priv *sdm660_cdc;
+	dwork = to_delayed_work(work);
+
+	sdm660_cdc = container_of(dwork, struct sdm660_cdc_priv, msm_anlg_wcd_mbhc_init_delay_work);
+
+	pr_err("%s: Begin wcd_mbhc_init_irq\n", __func__);
+
+	wcd_mbhc_init_irq(&sdm660_cdc->mbhc, sdm660_cdc->codec);
+}
+/* ASUS_BSP --- */
+
 static int msm_anlg_cdc_soc_probe(struct snd_soc_codec *codec)
 {
 	struct sdm660_cdc_priv *sdm660_cdc;
@@ -4412,6 +4427,12 @@ static int msm_anlg_cdc_soc_probe(struct snd_soc_codec *codec)
 
 	wcd_mbhc_init(&sdm660_cdc->mbhc, codec, &mbhc_cb, &intr_ids,
 		      wcd_mbhc_registers, true);
+
+	/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+	INIT_DELAYED_WORK(&sdm660_cdc->msm_anlg_wcd_mbhc_init_delay_work, msm_anlg_cdc_soc_probe_delay_work);
+	schedule_delayed_work(&sdm660_cdc->msm_anlg_wcd_mbhc_init_delay_work, msecs_to_jiffies(25000));
+	pr_debug("%s schedule_delayed_work done\n", __func__);
+	/* ASUS_BSP --- */
 
 	sdm660_cdc->int_mclk0_enabled = false;
 	/*Update speaker boost configuration*/

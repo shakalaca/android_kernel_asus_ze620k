@@ -182,6 +182,8 @@ struct sdm660_cdc_priv {
 	struct regulator_bulk_data *supplies;
 	struct snd_soc_codec *codec;
 	struct work_struct msm_anlg_add_child_devices_work;
+	/* ASUS_BSP Add delay request irq for fix internal codec headset irq block know issue +++ */
+	struct delayed_work msm_anlg_wcd_mbhc_init_delay_work;
 	struct msm_dig_ctrl_platform_data dig_plat_data;
 	/* digital codec data structure */
 	struct msm_dig_ctrl_data *dig_ctrl_data;
