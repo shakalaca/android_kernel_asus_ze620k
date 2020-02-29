@@ -231,7 +231,7 @@ int fake_temp = FAKE_TEMP_INIT;
 #define CYCLE_COUNT_DATA_MAGIC  0x85
 #define CYCLE_COUNT_FILE_NAME   "/dev/block/platform/soc/c0c4000.sdhci/by-name/asuskey3"
 #define BAT_PERCENT_FILE_NAME   "/asdf/Batpercentage"
-#define BAT_SAFETY_FILE_NAME   "/asdf/bat_safety"
+#define BAT_SAFETY_FILE_NAME   "/sdcard/bat_safety"
 #define CYCLE_COUNT_SD_FILE_NAME   "/sdcard/.bs"
 #define BAT_PERCENT_SD_FILE_NAME   "/sdcard/Batpercentage"
 #define BAT_CYCLE_SD_FILE_NAME   "/asdf/Batcyclecount"
